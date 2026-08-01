@@ -104,13 +104,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installMenuBarObservers()
         let initialMenuBarStatus = Self.menuBarStatus(
             tasks: store.tasks,
-            focusStore: focusStore
+            focusSelection: focusStore.selection
         )
         launchMenuBarHelper(status: initialMenuBarStatus)
         store.$tasks
             .combineLatest(focusStore.$selection)
-            .map { tasks, _ in
-                Self.menuBarStatus(tasks: tasks, focusStore: focusStore)
+            .map { tasks, selection in
+                Self.menuBarStatus(tasks: tasks, focusSelection: selection)
             }
             .removeDuplicates()
             .sink { status in
@@ -130,12 +130,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.$tasks
             .combineLatest(settings.$values)
             .combineLatest(focusStore.$selection)
-            .sink { [weak scheduler, weak reminderPanelController] pair, _ in
+            .sink { [weak scheduler, weak reminderPanelController] pair, selection in
                 let (tasks, values) = pair
                 let pendingTasks = tasks.filter { $0.status == .pending }
                 let lightReminderTasks = Self.lightReminderTasks(
                     tasks: tasks,
-                    focusStore: focusStore
+                    focusSelection: selection
                 )
                 scheduler?.configure(
                     enabled: values.reminderEnabled,
@@ -182,7 +182,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if let store, let focusStore {
                     focusStore.reconcile(existingTaskIDs: Set(store.tasks.map(\.id)))
                     Self.postMenuBarStatus(
-                        Self.menuBarStatus(tasks: store.tasks, focusStore: focusStore)
+                        Self.menuBarStatus(
+                            tasks: store.tasks,
+                            focusSelection: focusStore.selection
+                        )
                     )
                     self?.reconfigureReminderScheduler()
                 }
@@ -230,21 +233,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showReminder(testing: Bool = false) {
-        guard let pendingTasks = taskStore?.pendingTasks,
-              let settings = appSettings else {
+        guard taskStore != nil, let settings = appSettings else {
             reminderScheduler?.reminderClosed(pendingCount: 0)
             return
         }
         let focusPresentation = currentFocusReminderPresentation()
+        let reminderTasks = currentLightReminderTasks()
         let tasks: [TaskItem]
         if let focusPresentation {
             tasks = testing
                 ? ReminderPanelController.tasksForFocusTest(focusPresentation.tasks)
                 : focusPresentation.tasks
         } else if testing {
-            tasks = ReminderPanelController.tasksForTest(pendingTasks)
+            tasks = ReminderPanelController.tasksForTest(reminderTasks)
         } else {
-            tasks = pendingTasks
+            tasks = reminderTasks
         }
         guard !tasks.isEmpty else {
             reminderScheduler?.reminderClosed(pendingCount: 0)
@@ -397,21 +400,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let taskStore, let focusStore else { return [] }
         return Self.lightReminderTasks(
             tasks: taskStore.tasks,
-            focusStore: focusStore,
+            focusSelection: focusStore.selection,
             at: date
         )
     }
 
     private static func lightReminderTasks(
         tasks: [TaskItem],
-        focusStore: FocusStore,
+        focusSelection: DailyFocusSelection?,
         at date: Date = Date()
     ) -> [TaskItem] {
         ReminderScheduler.lightReminderTasks(
             in: tasks,
-            focusTaskIDs: focusStore.isActive(at: date)
-                ? focusStore.taskIDs(at: date)
-                : nil
+            focusTaskIDs: activeFocusTaskIDs(in: focusSelection, at: date)
         )
     }
 
@@ -429,6 +430,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return FocusReminderPresentation(
                 title: "当前专注",
                 statusText: "\(focusTasks.count)/\(focusTasks.count)",
+                tasks: []
+            )
+        }
+        guard focusTasks[index].group == .shortTerm else {
+            return FocusReminderPresentation(
+                title: "当前专注",
+                statusText: "\(index + 1)/\(focusTasks.count)",
                 tasks: []
             )
         }
@@ -455,20 +463,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             pendingTasks: taskStore.pendingTasks,
             lightReminderTasks: Self.lightReminderTasks(
                 tasks: taskStore.tasks,
-                focusStore: focusStore
+                focusSelection: focusStore.selection
             )
         )
     }
 
     private static func menuBarStatus(
         tasks: [TaskItem],
-        focusStore: FocusStore,
+        focusSelection: DailyFocusSelection?,
         at date: Date = Date()
     ) -> MenuBarStatus {
         let pendingCount = tasks.filter {
             $0.status == .pending && $0.group == .shortTerm
         }.count
-        guard focusStore.isActive(at: date) else {
+        guard let focusTaskIDs = activeFocusTaskIDs(
+            in: focusSelection,
+            at: date
+        ) else {
             return MenuBarStatus(
                 pendingCount: pendingCount,
                 focusTaskCount: nil,
@@ -477,7 +488,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
         let tasksByID = Dictionary(uniqueKeysWithValues: tasks.map { ($0.id, $0) })
-        let focusTasks = focusStore.taskIDs(at: date).compactMap { tasksByID[$0] }
+        let focusTasks = focusTaskIDs.compactMap { tasksByID[$0] }
         let pendingFocusTasks = focusTasks.filter { $0.status == .pending }
         return MenuBarStatus(
             pendingCount: pendingCount,
@@ -485,6 +496,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             focusCompleted: pendingFocusTasks.isEmpty,
             currentFocusText: pendingFocusTasks.first?.text
         )
+    }
+
+    private static func activeFocusTaskIDs(
+        in selection: DailyFocusSelection?,
+        at date: Date
+    ) -> [UUID]? {
+        guard let selection,
+              selection.dayKey == FocusStore.dayKey(for: date),
+              !selection.orderedTaskIDs.isEmpty else {
+            return nil
+        }
+        return selection.orderedTaskIDs
     }
 
     private static func postMenuBarStatus(_ status: MenuBarStatus) {

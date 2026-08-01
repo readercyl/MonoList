@@ -47,6 +47,16 @@ struct MenuBarBridgeSmoke {
             appDelegateSource.contains("focusTaskCount: focusTasks.count"),
             "菜单栏应显示今日专注总数，而不是剩余数"
         )
+        precondition(
+            appDelegateSource.contains(".map { tasks, selection in"),
+            "菜单栏同步必须使用专注订阅传入的新状态"
+        )
+        precondition(
+            appDelegateSource.contains(
+                "menuBarStatus(tasks: tasks, focusSelection: selection)"
+            ),
+            "菜单栏不能在 Published 更新完成前重新读取旧专注状态"
+        )
         precondition(MenuBarBridgeProtocol.showMainPanel.rawValue.hasPrefix(
             "com.qingcheng.monolist."
         ))

@@ -288,12 +288,19 @@ final class ReminderScheduler: ObservableObject {
         focusTaskIDs: [UUID]?
     ) -> [TaskItem] {
         let pendingTasks = tasks.filter { $0.status == .pending }
-        guard let focusTaskIDs else { return pendingTasks }
+        guard let focusTaskIDs else {
+            return Array(
+                pendingTasks
+                    .filter { $0.group == .shortTerm }
+                    .prefix(3)
+            )
+        }
         let tasksByID = Dictionary(uniqueKeysWithValues: tasks.map { ($0.id, $0) })
         let currentTask = focusTaskIDs
             .compactMap { tasksByID[$0] }
             .first { $0.status == .pending }
-        return currentTask.map { [$0] } ?? []
+        guard let currentTask, currentTask.group == .shortTerm else { return [] }
+        return [currentTask]
     }
 
     static func dedicatedReminderDate(

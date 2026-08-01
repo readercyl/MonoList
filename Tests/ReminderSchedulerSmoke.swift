@@ -195,12 +195,47 @@ struct ReminderSchedulerSmoke {
             queuedDispatches == queuedIDs,
             "多条同时到期提醒应按任务顺序逐条展示"
         )
+        let longTermTask = TaskItem(
+            id: UUID(),
+            text: "长期任务不进入轻提醒",
+            status: .pending,
+            order: 2,
+            createdAt: wallClock,
+            updatedAt: wallClock,
+            completedAt: nil,
+            group: .longTerm
+        )
         precondition(
             ReminderScheduler.lightReminderTasks(
-                in: queuedTasks,
+                in: queuedTasks + [longTermTask],
                 focusTaskIDs: nil
             ).map(\.id) == queuedIDs,
-            "没有今日专注时，轻提醒应使用全部未完成任务"
+            "没有今日专注时，轻提醒只能使用未完成的短期任务"
+        )
+        precondition(
+            ReminderScheduler.lightReminderTasks(
+                in: [longTermTask],
+                focusTaskIDs: nil
+            ).isEmpty,
+            "只有长期任务时不应启动轻提醒"
+        )
+        let overflowTasks = (0..<5).map { index in
+            TaskItem(
+                id: UUID(),
+                text: "短期任务 \(index + 1)",
+                status: .pending,
+                order: index,
+                createdAt: wallClock,
+                updatedAt: wallClock,
+                completedAt: nil
+            )
+        }
+        precondition(
+            ReminderScheduler.lightReminderTasks(
+                in: overflowTasks,
+                focusTaskIDs: nil
+            ).map(\.id) == Array(overflowTasks.prefix(3)).map(\.id),
+            "轻提醒弹窗最多只能展示三条短期任务"
         )
         precondition(
             ReminderScheduler.lightReminderTasks(
@@ -208,6 +243,13 @@ struct ReminderSchedulerSmoke {
                 focusTaskIDs: [queuedIDs[1]]
             ).map(\.id) == [queuedIDs[1]],
             "设置今日专注后，轻提醒只能使用当前专注任务"
+        )
+        precondition(
+            ReminderScheduler.lightReminderTasks(
+                in: [longTermTask] + queuedTasks,
+                focusTaskIDs: [longTermTask.id, queuedIDs[0]]
+            ).isEmpty,
+            "当前专注为长期任务时不应跳过它去提醒后续短期任务"
         )
         let completedFocusTask = TaskItem(
             id: UUID(),
