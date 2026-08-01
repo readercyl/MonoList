@@ -64,6 +64,7 @@ struct SettingsValues: Codable, Equatable {
     var reminderPosition = ReminderPosition.topCenter
     var reminderSoundEnabled: Bool? = true
     var reminderSoundName = "Glass"
+    var automaticUpdatesEnabled = true
     var launchAtLogin = false
     var globalShortcut: ShortcutDefinition?
     var lastAutomaticUpdateCheckAt: Date?
@@ -78,6 +79,7 @@ struct SettingsValues: Codable, Equatable {
         case reminderPosition
         case reminderSoundEnabled
         case reminderSoundName
+        case automaticUpdatesEnabled
         case launchAtLogin
         case globalShortcut
         case lastAutomaticUpdateCheckAt
@@ -113,6 +115,10 @@ struct SettingsValues: Codable, Equatable {
             String.self,
             forKey: .reminderSoundName
         ) ?? "Glass"
+        automaticUpdatesEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .automaticUpdatesEnabled
+        ) ?? true
         launchAtLogin = try container.decodeIfPresent(
             Bool.self,
             forKey: .launchAtLogin
@@ -156,6 +162,7 @@ final class AppSettings: ObservableObject {
     var reminderPosition: ReminderPosition { values.reminderPosition }
     var reminderSoundEnabled: Bool { values.reminderSoundEnabled ?? true }
     var reminderSoundName: String { values.reminderSoundName }
+    var automaticUpdatesEnabled: Bool { values.automaticUpdatesEnabled }
     var launchAtLogin: Bool { values.launchAtLogin }
     var globalShortcut: ShortcutDefinition? { values.globalShortcut }
     var lastAutomaticUpdateCheckAt: Date? { values.lastAutomaticUpdateCheckAt }

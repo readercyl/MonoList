@@ -223,23 +223,36 @@ struct SettingsView: View {
     ].filter { NSSound(named: NSSound.Name($0)) != nil }
 
     private var startupSettings: some View {
-        settingsRow("开机后自动启动") {
-            Toggle(
-                "",
-                isOn: Binding(
-                    get: { loginItemController.status == .enabled },
-                    set: { enabled in
-                        do {
-                            try loginItemController.setEnabled(enabled)
-                            try settings.update { $0.launchAtLogin = enabled }
-                        } catch {
-                            errorMessage = error.localizedDescription
-                        }
-                    }
+        VStack(spacing: 8) {
+            settingsRow("自动更新") {
+                Toggle(
+                    "",
+                    isOn: binding(
+                        get: { settings.automaticUpdatesEnabled },
+                        update: { $0.automaticUpdatesEnabled = $1 }
+                    )
                 )
-            )
-            .labelsHidden()
-            .toggleStyle(SettingsSwitchStyle())
+                .labelsHidden()
+                .toggleStyle(SettingsSwitchStyle())
+            }
+            settingsRow("开机后自动启动") {
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { loginItemController.status == .enabled },
+                        set: { enabled in
+                            do {
+                                try loginItemController.setEnabled(enabled)
+                                try settings.update { $0.launchAtLogin = enabled }
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                        }
+                    )
+                )
+                .labelsHidden()
+                .toggleStyle(SettingsSwitchStyle())
+            }
         }
     }
 

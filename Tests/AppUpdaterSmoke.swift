@@ -47,6 +47,42 @@ struct AppUpdaterSmoke {
             lastCheckedAt: Date(),
             now: Date()
         ))
+
+        let settingsDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MonoListUpdaterTests-\(UUID().uuidString)")
+        let settings = AppSettings(
+            fileURL: settingsDirectory.appendingPathComponent("settings.json")
+        )
+        ReleaseURLProtocol.requestedHosts = []
+        ReleaseURLProtocol.requestedPaths = []
+        let automaticUpdater = AppUpdater(currentVersion: "0.4.7", session: session)
+        let automaticUpdate = await automaticUpdater.check(
+            manual: false,
+            settings: settings
+        )
+        precondition(automaticUpdate?.version == "v0.4.8")
+        precondition(settings.lastAutomaticUpdateCheckAt != nil)
+
+        try settings.update { $0.automaticUpdatesEnabled = false }
+        ReleaseURLProtocol.requestedHosts = []
+        let disabledResult = await automaticUpdater.check(
+            manual: false,
+            settings: settings
+        )
+        precondition(disabledResult == nil)
+        precondition(
+            ReleaseURLProtocol.requestedHosts.isEmpty,
+            "关闭自动更新后不应发起后台版本检测"
+        )
+
+        let appDelegateSource = try String(
+            contentsOfFile: "MonoList/App/AppDelegate.swift",
+            encoding: .utf8
+        )
+        precondition(
+            appDelegateSource.contains("await installUpdate(update, offersRetry: false)"),
+            "后台发现新版本后应自动进入安装流程"
+        )
         let updater = AppUpdater(currentVersion: "0.4.3")
         updater.beginInstallation()
         precondition(updater.isInstalling)

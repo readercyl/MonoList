@@ -67,25 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             updater: updater,
             onInstallUpdate: { [weak self] update in
                 Task { @MainActor in
-                    self?.appUpdater?.beginInstallation()
-                    do {
-                        try await self?.updateInstaller?.install(update)
-                    } catch {
-                        self?.appUpdater?.installationFailed()
-                        let alert = NSAlert()
-                        alert.messageText = "升级失败"
-                        alert.informativeText = error.localizedDescription
-                        alert.addButton(withTitle: "重试")
-                        alert.addButton(withTitle: "取消")
-                        if alert.runModal() == .alertFirstButtonReturn {
-                            self?.appUpdater?.beginInstallation()
-                            do {
-                                try await self?.updateInstaller?.install(update)
-                            } catch {
-                                self?.appUpdater?.installationFailed()
-                            }
-                        }
-                    }
+                    await self?.installUpdate(update, offersRetry: true)
                 }
             },
             onTestReminder: { [weak self] in
@@ -165,14 +147,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil
         )
 
-        Task {
-            await updater.check(manual: false, settings: settings)
+        Task { [weak self] in
+            await self?.checkForAutomaticUpdate()
         }
         updateCheckTimer = Timer.scheduledTimer(withTimeInterval: 60 * 60, repeats: true) {
-            [weak updater, weak settings] _ in
+            [weak self] _ in
             Task { @MainActor in
-                guard let updater, let settings else { return }
-                await updater.check(manual: false, settings: settings)
+                await self?.checkForAutomaticUpdate()
             }
         }
         dailyReminderRefreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) {
@@ -394,6 +375,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showOrFocusMainPanelAtFallback() {
         windowCoordinator?.showOrFocusMainPanelFromMenuBar()
+    }
+
+    private func checkForAutomaticUpdate() async {
+        guard let updater = appUpdater,
+              let settings = appSettings,
+              let update = await updater.check(manual: false, settings: settings),
+              settings.automaticUpdatesEnabled else {
+            return
+        }
+        await installUpdate(update, offersRetry: false)
+    }
+
+    private func installUpdate(
+        _ update: AppUpdate,
+        offersRetry: Bool
+    ) async {
+        guard let updater = appUpdater,
+              let installer = updateInstaller,
+              !updater.isInstalling else {
+            return
+        }
+        updater.beginInstallation()
+        do {
+            try await installer.install(update)
+        } catch {
+            updater.installationFailed()
+            guard offersRetry else { return }
+
+            let alert = NSAlert()
+            alert.messageText = "升级失败"
+            alert.informativeText = error.localizedDescription
+            alert.addButton(withTitle: "重试")
+            alert.addButton(withTitle: "取消")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+            updater.beginInstallation()
+            do {
+                try await installer.install(update)
+            } catch {
+                updater.installationFailed()
+            }
+        }
     }
 
     private func currentLightReminderTasks(at date: Date = Date()) -> [TaskItem] {

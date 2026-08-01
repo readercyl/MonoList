@@ -36,15 +36,19 @@ final class AppUpdater: ObservableObject {
         self.session = session
     }
 
-    func check(manual: Bool, settings: AppSettings) async {
-        guard !isChecking else {
-            return
+    @discardableResult
+    func check(manual: Bool, settings: AppSettings) async -> AppUpdate? {
+        guard !isChecking, !isInstalling else {
+            return nil
         }
         if !manual {
+            guard settings.automaticUpdatesEnabled else {
+                return nil
+            }
             guard Self.shouldAutomaticallyCheck(
                 lastCheckedAt: settings.lastAutomaticUpdateCheckAt
             ) else {
-                return
+                return nil
             }
             try? settings.update { $0.lastAutomaticUpdateCheckAt = Date() }
         }
@@ -60,15 +64,18 @@ final class AppUpdater: ObservableObject {
         case let .available(update):
             availableUpdate = update
             statusText = "发现新版本 \(update.version)"
+            return update
         case .upToDate:
             availableUpdate = nil
             if manual {
                 statusText = "已是最新版"
             }
+            return nil
         case let .failed(message):
             if manual {
                 statusText = message
             }
+            return nil
         }
     }
 
