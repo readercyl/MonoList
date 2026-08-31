@@ -10,16 +10,7 @@ struct TaskTextEditor: NSViewRepresentable {
 
     func makeNSView(context: Context) -> TaskSubmitTextView {
         let view = TaskSubmitTextView()
-        view.font = .systemFont(ofSize: fontSize, weight: fontWeight)
-        view.isRichText = false
-        view.drawsBackground = false
-        view.isHorizontallyResizable = false
-        view.isVerticallyResizable = true
-        view.textContainerInset = .zero
-        view.textContainer?.lineFragmentPadding = 0
-        view.textContainer?.widthTracksTextView = true
-        view.setContentHuggingPriority(.required, for: .vertical)
-        view.setContentCompressionResistancePriority(.required, for: .vertical)
+        configure(view)
         view.onTextChange = { text = $0 }
         view.onFocusChange = { isFocused = $0 }
         view.onSubmit = onSubmit
@@ -27,7 +18,7 @@ struct TaskTextEditor: NSViewRepresentable {
     }
 
     func updateNSView(_ view: TaskSubmitTextView, context: Context) {
-        view.font = .systemFont(ofSize: fontSize, weight: fontWeight)
+        configure(view)
         if view.string != text {
             view.string = text
             view.invalidateIntrinsicContentSize()
@@ -44,6 +35,29 @@ struct TaskTextEditor: NSViewRepresentable {
         } else if !isFocused, view.window?.firstResponder === view {
             view.window?.makeFirstResponder(nil)
         }
+    }
+
+    private func configure(_ view: TaskSubmitTextView) {
+        view.font = .systemFont(ofSize: fontSize, weight: fontWeight)
+        view.isRichText = false
+        view.drawsBackground = false
+        view.isHorizontallyResizable = false
+        view.isVerticallyResizable = true
+        view.textContainerInset = .zero
+        view.textContainer?.lineFragmentPadding = 0
+        view.textContainer?.widthTracksTextView = true
+        view.textContainer?.heightTracksTextView = false
+        view.setContentHuggingPriority(.required, for: .vertical)
+        view.setContentCompressionResistancePriority(.required, for: .vertical)
+
+        // Task text should preserve the characters entered by the user. In
+        // particular, AppKit's smart substitutions must not rewrite quotes,
+        // dashes, or other punctuation while an IME is composing text.
+        view.isAutomaticTextReplacementEnabled = false
+        view.isAutomaticQuoteSubstitutionEnabled = false
+        view.isAutomaticDashSubstitutionEnabled = false
+        view.isAutomaticSpellingCorrectionEnabled = false
+        view.enabledTextCheckingTypes = 0
     }
 }
 

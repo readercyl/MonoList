@@ -4,13 +4,17 @@ import SwiftUI
 
 @MainActor
 final class ReminderPanelController: ObservableObject {
-    static let displayDurationSeconds: TimeInterval = 6
+    static let displayDurationSeconds: TimeInterval = 3
+    static let dedicatedSoundRepeatCount = 3
+    static let dedicatedSoundRepeatInterval: TimeInterval = 0.6
 
     @Published private(set) var isTesting = false
     private(set) var isDedicatedReminder = false
 
     private var panel: NSPanel?
     private var countdownTimer: Timer?
+    private var soundRepeatTimer: Timer?
+    private var remainingSoundRepeats = 0
     private var remainingTenths = Int(displayDurationSeconds * 10)
     private var model: ReminderPresentationModel?
     private var onClose: (() -> Void)?
@@ -101,6 +105,7 @@ final class ReminderPanelController: ObservableObject {
         }
 
         let snapshot = Array(tasks.prefix(3))
+        let panelWidth: CGFloat = isFocusReminder ? 420 : 340
         let model = ReminderPresentationModel()
         let hostingView = NSHostingView(
             rootView: ReminderView(
@@ -119,8 +124,9 @@ final class ReminderPanelController: ObservableObject {
                 }
             )
         )
+        hostingView.frame = NSRect(x: 0, y: 0, width: panelWidth, height: 0)
+        hostingView.layoutSubtreeIfNeeded()
         let contentHeight = ceil(hostingView.fittingSize.height)
-        let panelWidth: CGFloat = isFocusReminder ? 420 : 340
         let panel = PassiveReminderPanel(
             contentRect: NSRect(x: 0, y: 0, width: panelWidth, height: contentHeight),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -160,7 +166,12 @@ final class ReminderPanelController: ObservableObject {
         isClosing = false
         remainingTenths = Int(Self.displayDurationSeconds * 10)
         if playsSound {
-            playSound(Self.resolvedSoundName(soundName))
+            playReminderSound(
+                name: Self.resolvedSoundName(soundName),
+                repeatCount: isDedicatedReminder
+                    ? Self.dedicatedSoundRepeatCount
+                    : 1
+            )
         }
         DispatchQueue.main.async { [weak self, weak panel] in
             guard let self, let panel, self.panel === panel else { return }
@@ -180,6 +191,7 @@ final class ReminderPanelController: ObservableObject {
     }
 
     func close(animated: Bool = true, notifying: Bool = true) {
+        stopSoundRepeats()
         guard let panel else {
             isTesting = false
             isDedicatedReminder = false
@@ -217,6 +229,42 @@ final class ReminderPanelController: ObservableObject {
                 self.finishClosing(panel: panel, notifying: notifying)
             }
         }
+    }
+
+    private func playReminderSound(name: String, repeatCount: Int) {
+        let count = max(0, repeatCount)
+        guard count > 0 else { return }
+
+        playSound(name)
+        guard count > 1 else { return }
+
+        remainingSoundRepeats = count - 1
+        let timer = Timer(timeInterval: Self.dedicatedSoundRepeatInterval, repeats: true) {
+            [weak self] timer in
+            Task { @MainActor in
+                guard let self else {
+                    timer.invalidate()
+                    return
+                }
+                guard self.remainingSoundRepeats > 0 else {
+                    self.stopSoundRepeats()
+                    return
+                }
+                self.playSound(name)
+                self.remainingSoundRepeats -= 1
+                if self.remainingSoundRepeats == 0 {
+                    self.stopSoundRepeats()
+                }
+            }
+        }
+        soundRepeatTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func stopSoundRepeats() {
+        soundRepeatTimer?.invalidate()
+        soundRepeatTimer = nil
+        remainingSoundRepeats = 0
     }
 
     static func presentationStartFrame(for finalFrame: NSRect) -> NSRect {

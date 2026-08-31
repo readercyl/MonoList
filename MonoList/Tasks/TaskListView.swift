@@ -23,6 +23,7 @@ struct TaskListView: View {
     @StateObject private var dropCoordinator = TaskDropCoordinator()
     @State private var draftScrollRequest = UUID()
     @State private var taskRowHeights: [UUID: CGFloat] = [:]
+    @State private var draftRowHeight: CGFloat?
     @State private var showsOtherTasks = true
     @State private var rendersOtherTasks = true
     @State private var otherTasksTransitionID = UUID()
@@ -110,11 +111,18 @@ struct TaskListView: View {
     }
 
     private var naturalHeight: CGFloat {
-        var extraLines = (todayCompleted + visibleOlderCompleted).reduce(0) {
+        let extraLines = (todayCompleted + visibleOlderCompleted).reduce(0) {
             $0 + Self.additionalLines(for: $1.text)
         }
-        if draftState.isPresented {
-            extraLines += Self.additionalLines(for: draftState.text)
+        let draftAdditionalHeight: CGFloat
+        if draftState.isPresented, let draftRowHeight {
+            draftAdditionalHeight = max(0, draftRowHeight - 36)
+        } else if draftState.isPresented {
+            draftAdditionalHeight = CGFloat(
+                Self.additionalLines(for: draftState.text) * 13
+            )
+        } else {
+            draftAdditionalHeight = 0
         }
         let pendingAdditionalHeight = otherPendingTasks.reduce(CGFloat.zero) {
             height, item in
@@ -138,7 +146,7 @@ struct TaskListView: View {
         let focusHeight = hasActiveFocus
             ? Self.focusSectionHeight(for: activeFocusTasks) + 40
             : 61
-        return otherContentHeight + focusHeight + 58
+        return otherContentHeight + draftAdditionalHeight + focusHeight + 58
     }
 
     private var preferredHeight: CGFloat {
@@ -330,6 +338,9 @@ struct TaskListView: View {
             .frame(maxWidth: .infinity, alignment: .top)
             .onPreferenceChange(TaskRowHeightPreferenceKey.self) { heights in
                 taskRowHeights = heights
+            }
+            .onPreferenceChange(DraftRowHeightPreferenceKey.self) { height in
+                draftRowHeight = height
             }
         }
     }
@@ -994,6 +1005,14 @@ struct TaskListView: View {
             Color.primary.opacity(0.03),
             in: RoundedRectangle(cornerRadius: 9)
         )
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: DraftRowHeightPreferenceKey.self,
+                    value: proxy.size.height
+                )
+            }
+        }
     }
 
     private var completedSection: some View {
@@ -1173,6 +1192,7 @@ struct TaskListView: View {
         guard draftState.isPresented else { return }
         do {
             _ = try draftState.submitAndContinue(to: store)
+            draftRowHeight = nil
             selectedTaskID = nil
             editingTaskID = nil
             draftScrollRequest = UUID()
@@ -1195,6 +1215,7 @@ struct TaskListView: View {
     private func focusDraft(after id: UUID?, in group: TaskGroup = .shortTerm) {
         selectedTaskID = nil
         editingTaskID = nil
+        draftRowHeight = nil
         draftState.present(after: id, in: group)
         draftScrollRequest = UUID()
         DispatchQueue.main.async {
@@ -1446,6 +1467,17 @@ private struct TaskRowHeightPreferenceKey: PreferenceKey {
         nextValue: () -> [UUID: CGFloat]
     ) {
         value.merge(nextValue(), uniquingKeysWith: { _, newValue in newValue })
+    }
+}
+
+private struct DraftRowHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat? = nil
+
+    static func reduce(
+        value: inout CGFloat?,
+        nextValue: () -> CGFloat?
+    ) {
+        value = nextValue()
     }
 }
 

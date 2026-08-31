@@ -291,7 +291,9 @@ final class ReminderScheduler: ObservableObject {
         guard let focusTaskIDs else {
             return Array(
                 pendingTasks
-                    .filter { $0.group == .shortTerm }
+                    .filter {
+                        $0.group == .shortTerm && $0.reminder == nil
+                    }
                     .prefix(3)
             )
         }
@@ -299,7 +301,12 @@ final class ReminderScheduler: ObservableObject {
         let currentTask = focusTaskIDs
             .compactMap { tasksByID[$0] }
             .first { $0.status == .pending }
-        guard let currentTask, currentTask.group == .shortTerm else { return [] }
+        guard let currentTask,
+              currentTask.status == .pending,
+              currentTask.group == .shortTerm,
+              currentTask.reminder == nil else {
+            return []
+        }
         return [currentTask]
     }
 

@@ -207,6 +207,28 @@ struct WindowCoordinatorSmoke {
         let pasteEvent = commandKeyEvent(character: "v", keyCode: 9)
         precondition(directEditor.performKeyEquivalent(with: pasteEvent))
         precondition(directEditor.string == "可以复制的待办")
+        let configuredEditorHost = NSHostingView(
+            rootView: TaskEditorSizingProbe(text: "")
+        )
+        configuredEditorHost.frame = NSRect(x: 0, y: 0, width: 310, height: 90)
+        let configuredEditorWindow = NSWindow(
+            contentRect: configuredEditorHost.frame,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        configuredEditorWindow.contentView = configuredEditorHost
+        configuredEditorHost.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        configuredEditorHost.layoutSubtreeIfNeeded()
+        guard let configuredEditor = findTaskTextView(in: configuredEditorHost) else {
+            throw CocoaError(.coderInvalidValue)
+        }
+        precondition(!configuredEditor.isAutomaticTextReplacementEnabled)
+        precondition(!configuredEditor.isAutomaticQuoteSubstitutionEnabled)
+        precondition(!configuredEditor.isAutomaticDashSubstitutionEnabled)
+        precondition(!configuredEditor.isAutomaticSpellingCorrectionEnabled)
+        precondition(configuredEditor.enabledTextCheckingTypes == 0)
         let emptyDraftHeight = try measuredTaskEditorHeight(
             text: "",
             width: 310,
@@ -219,6 +241,17 @@ struct WindowCoordinatorSmoke {
             offeredHeight: 90
         )
         precondition(wrappedDraftHeight > emptyDraftHeight)
+        let threeLineDraftHeight = try measuredTaskEditorHeight(
+            text: "第一行\n第二行\n第三行",
+            width: 310,
+            offeredHeight: 200
+        )
+        let fourLineDraftHeight = try measuredTaskEditorHeight(
+            text: "第一行\n第二行\n第三行\n第四行",
+            width: 310,
+            offeredHeight: 200
+        )
+        precondition(fourLineDraftHeight > threeLineDraftHeight)
         let taskListSource = try String(
             contentsOfFile: "MonoList/Tasks/TaskListView.swift",
             encoding: .utf8
@@ -232,6 +265,7 @@ struct WindowCoordinatorSmoke {
         precondition(
             taskListSource.contains("private func focusDraft(after id: UUID?, in group: TaskGroup")
         )
+        precondition(taskListSource.contains("DraftRowHeightPreferenceKey"))
         precondition(
             taskListSource.contains("TaskDragPreview(text:")
         )
@@ -299,6 +333,7 @@ struct WindowCoordinatorSmoke {
         )
         precondition(taskRowSource.contains("struct TaskCompletionButton"))
         precondition(taskRowSource.contains("let delay = reduceMotion ? 0 : 0.24"))
+        precondition(taskRowSource.contains("guard !isEditingMode else { return }"))
         let headerIconStart = taskListSource.range(
             of: "private struct HeaderIconLabel"
         )

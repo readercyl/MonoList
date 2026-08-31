@@ -149,7 +149,8 @@ struct ReminderSchedulerSmoke {
         precondition(focusTestTasks.count == 1)
         precondition(focusTestTasks[0].text == "这是一次专注提醒测试")
         precondition(ReminderPanelController.resolvedSoundName("不存在的声音") == "Glass")
-        precondition(ReminderPanelController.displayDurationSeconds == 6)
+        precondition(ReminderPanelController.displayDurationSeconds == 3)
+        precondition(ReminderPanelController.dedicatedSoundRepeatCount == 3)
 
         let queuedIDs = [
             UUID(uuidString: "00000000-0000-0000-0000-000000000211")!,
@@ -209,8 +210,8 @@ struct ReminderSchedulerSmoke {
             ReminderScheduler.lightReminderTasks(
                 in: queuedTasks + [longTermTask],
                 focusTaskIDs: nil
-            ).map(\.id) == queuedIDs,
-            "没有今日专注时，轻提醒只能使用未完成的短期任务"
+            ).isEmpty,
+            "已经设置单条定时提醒的任务不应进入轻提醒"
         )
         precondition(
             ReminderScheduler.lightReminderTasks(
@@ -241,8 +242,15 @@ struct ReminderSchedulerSmoke {
             ReminderScheduler.lightReminderTasks(
                 in: queuedTasks,
                 focusTaskIDs: [queuedIDs[1]]
-            ).map(\.id) == [queuedIDs[1]],
-            "设置今日专注后，轻提醒只能使用当前专注任务"
+            ).isEmpty,
+            "当前专注任务已有单条提醒时不应再次进入轻提醒"
+        )
+        precondition(
+            ReminderScheduler.lightReminderTasks(
+                in: overflowTasks,
+                focusTaskIDs: [overflowTasks[1].id]
+            ).map(\.id) == [overflowTasks[1].id],
+            "没有单条提醒的当前专注任务仍应进入轻提醒"
         )
         precondition(
             ReminderScheduler.lightReminderTasks(
@@ -289,21 +297,41 @@ struct ReminderSchedulerSmoke {
         reminderView.layoutSubtreeIfNeeded()
         precondition(reminderView.fittingSize.height < 110)
 
+        let shortFocusReminderView = NSHostingView(
+            rootView: ReminderView(
+                title: "当前专注",
+                statusText: "1/3",
+                isFocusReminder: true,
+                totalCount: 1,
+                taskTexts: ["短任务"],
+                model: reminderModel,
+                onOpen: {},
+                onClose: {}
+            )
+        )
+        shortFocusReminderView.frame = NSRect(x: 0, y: 0, width: 420, height: 300)
+        shortFocusReminderView.layoutSubtreeIfNeeded()
+
         let focusReminderView = NSHostingView(
             rootView: ReminderView(
                 title: "当前专注",
                 statusText: "1/3",
                 isFocusReminder: true,
                 totalCount: 1,
-                taskTexts: ["调研沉浸式翻译的技术路线，确认页面结构和交互可以完整保留"],
+                taskTexts: ["第一行\n第二行\n第三行"],
                 model: reminderModel,
                 onOpen: {},
                 onClose: {}
             )
         )
+        focusReminderView.frame = NSRect(x: 0, y: 0, width: 420, height: 300)
         focusReminderView.layoutSubtreeIfNeeded()
         precondition(focusReminderView.fittingSize.width == 420)
-        precondition(focusReminderView.fittingSize.height >= 150)
+        precondition(shortFocusReminderView.fittingSize.height < 150)
+        precondition(
+            focusReminderView.fittingSize.height > shortFocusReminderView.fittingSize.height,
+            "专注轻提醒高度应随任务文字行数增加"
+        )
 
         let appDelegateSource = try! String(
             contentsOfFile: "MonoList/App/AppDelegate.swift",
@@ -367,7 +395,7 @@ struct ReminderSchedulerSmoke {
             onClose: {}
         )
         precondition(controller.currentPanelWidth == 420)
-        precondition((controller.currentPanelHeight ?? 0) >= 150)
+        precondition((controller.currentPanelHeight ?? 0) < 150)
         controller.close(animated: false)
         controller.show(
             tasks: testTasks,
@@ -395,6 +423,30 @@ struct ReminderSchedulerSmoke {
             onClose: {}
         )
         precondition(playedSounds == ["Ping", "Ping"])
+        controller.close(animated: false)
+
+        let dedicatedSoundStartCount = playedSounds.count
+        controller.show(
+            tasks: testTasks,
+            position: .topCenter,
+            menuBarButton: nil,
+            isDedicatedReminder: true,
+            testing: true,
+            soundName: "Ping",
+            onOpen: {},
+            onClose: {}
+        )
+        precondition(playedSounds.count == dedicatedSoundStartCount + 1)
+        RunLoop.main.run(
+            until: Date().addingTimeInterval(
+                ReminderPanelController.dedicatedSoundRepeatInterval * 2 + 0.2
+            )
+        )
+        precondition(
+            playedSounds.count == dedicatedSoundStartCount +
+                ReminderPanelController.dedicatedSoundRepeatCount,
+            "单条定时提醒应响三声"
+        )
         controller.close(animated: false)
 
         print("Reminder scheduler smoke passed.")

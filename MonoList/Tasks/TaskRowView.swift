@@ -147,7 +147,14 @@ struct TaskRowView: View {
             value: isSelected
         )
         .contentShape(Rectangle())
-        .simultaneousGesture(TapGesture().onEnded(onSelect))
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                // Let NSTextView keep the click when this row is editing so
+                // the user can place or extend the insertion point.
+                guard !isEditingMode else { return }
+                onSelect()
+            }
+        )
         .onHover { isHovered = $0 }
         .animation(
             reduceMotion ? nil : .easeOut(duration: 0.16),

@@ -67,7 +67,7 @@ struct ReminderView: View {
         .padding(.top, 20)
         .padding(.bottom, 21)
         .frame(width: 420, alignment: .leading)
-        .frame(minHeight: 150, alignment: .topLeading)
+        .fixedSize(horizontal: false, vertical: true)
         .background(Color.white, in: RoundedRectangle(cornerRadius: 17))
     }
 
