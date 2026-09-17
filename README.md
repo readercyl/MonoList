@@ -88,3 +88,7 @@ Developer ID、不进行 Apple 公证，也不上架 App Store。首次运行时
 ```bash
 MONOLIST_APP_VERSION=vX.Y.Z bash scripts/package-dmg.sh
 ```
+
+## 产品物料
+
+设计与商品详情页资料已移至开发区产品容器的[产品物料说明](../产品物料/物料说明.md)。App 源码、测试和构建脚本仍保留在本代码仓库。
