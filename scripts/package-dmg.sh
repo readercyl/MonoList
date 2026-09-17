@@ -25,6 +25,7 @@ if [[ -z "$CODESIGN_IDENTITY" ]]; then
 fi
 
 MONOLIST_APP_VERSION="$APP_VERSION" \
+MONOLIST_BUILD_FLAVOR=release \
 MONOLIST_CODESIGN_IDENTITY="$CODESIGN_IDENTITY" \
   "$ROOT_DIR/scripts/build-local.sh" >/dev/null
 

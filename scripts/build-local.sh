@@ -2,18 +2,37 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-APP_NAME="MonoList"
+BUILD_FLAVOR="${MONOLIST_BUILD_FLAVOR:-development}"
+case "$BUILD_FLAVOR" in
+  development)
+    APP_BUNDLE_NAME="MonoList 开发版.app"
+    PRODUCT_DISPLAY_NAME="MonoList 开发版"
+    BUNDLE_IDENTIFIER="com.qingcheng.monolist.dev"
+    HELPER_BUNDLE_IDENTIFIER="com.qingcheng.monolist.dev.menubar"
+    ;;
+  release)
+    APP_BUNDLE_NAME="MonoList.app"
+    PRODUCT_DISPLAY_NAME="MonoList"
+    BUNDLE_IDENTIFIER="com.qingcheng.monolist.mac"
+    HELPER_BUNDLE_IDENTIFIER="com.qingcheng.monolist.menubar.v2"
+    ;;
+  *)
+    echo "MONOLIST_BUILD_FLAVOR 必须是 development 或 release。" >&2
+    exit 1
+    ;;
+esac
+EXECUTABLE_NAME="MonoList"
 APP_VERSION="${MONOLIST_APP_VERSION:-v0.1.0}"
 BUNDLE_SHORT_VERSION="${APP_VERSION#v}"
 APP_BUILD="${MONOLIST_APP_BUILD:-1}"
 MIN_MACOS_VERSION="14.0"
 SWIFT_TARGET="arm64-apple-macosx$MIN_MACOS_VERSION"
 BUILD_DIR="$ROOT_DIR/build/local"
-APP_DIR="$BUILD_DIR/$APP_NAME.app"
+APP_DIR="$BUILD_DIR/$APP_BUNDLE_NAME"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
-EXECUTABLE="$MACOS_DIR/$APP_NAME"
+EXECUTABLE="$MACOS_DIR/$EXECUTABLE_NAME"
 HELPER_APP_DIR="$CONTENTS_DIR/Library/Helpers/MenuBarService.app"
 HELPER_CONTENTS_DIR="$HELPER_APP_DIR/Contents"
 HELPER_MACOS_DIR="$HELPER_CONTENTS_DIR/MacOS"
@@ -58,16 +77,16 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
     <key>CFBundleDevelopmentRegion</key>
     <string>zh-Hans</string>
     <key>CFBundleDisplayName</key>
-    <string>MonoList</string>
+    <string>$PRODUCT_DISPLAY_NAME</string>
     <key>CFBundleExecutable</key>
-    <string>MonoList</string>
+    <string>$EXECUTABLE_NAME</string>
 $ICON_PLIST
     <key>CFBundleIdentifier</key>
-    <string>com.qingcheng.monolist.mac</string>
+    <string>$BUNDLE_IDENTIFIER</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>MonoList</string>
+    <string>$PRODUCT_DISPLAY_NAME</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -93,7 +112,7 @@ cat > "$HELPER_CONTENTS_DIR/Info.plist" <<PLIST
     <key>CFBundleExecutable</key>
     <string>MenuBarService</string>
     <key>CFBundleIdentifier</key>
-    <string>com.qingcheng.monolist.menubar.v2</string>
+    <string>$HELPER_BUNDLE_IDENTIFIER</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>

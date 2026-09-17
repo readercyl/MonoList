@@ -20,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarObservers: [NSObjectProtocol] = []
     private var cancellables = Set<AnyCancellable>()
 
+    private var isDevelopmentBuild: Bool {
+        Bundle.main.bundleIdentifier == "com.qingcheng.monolist.dev"
+    }
+
     static func main() {
         let application = NSApplication.shared
         let delegate = AppDelegate()
@@ -147,13 +151,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil
         )
 
-        Task { [weak self] in
-            await self?.checkForAutomaticUpdate()
-        }
-        updateCheckTimer = Timer.scheduledTimer(withTimeInterval: 60 * 60, repeats: true) {
-            [weak self] _ in
-            Task { @MainActor in
+        if !isDevelopmentBuild {
+            Task { [weak self] in
                 await self?.checkForAutomaticUpdate()
+            }
+            updateCheckTimer = Timer.scheduledTimer(
+                withTimeInterval: 60 * 60,
+                repeats: true
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    await self?.checkForAutomaticUpdate()
+                }
             }
         }
         dailyReminderRefreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) {
@@ -378,6 +386,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func checkForAutomaticUpdate() async {
+        guard !isDevelopmentBuild else { return }
         guard let updater = appUpdater,
               let settings = appSettings,
               let update = await updater.check(manual: false, settings: settings),
@@ -391,6 +400,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ update: AppUpdate,
         offersRetry: Bool
     ) async {
+        guard !isDevelopmentBuild else { return }
         guard let updater = appUpdater,
               let installer = updateInstaller,
               !updater.isInstalling else {

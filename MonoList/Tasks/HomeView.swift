@@ -40,6 +40,11 @@ struct HomeView: View {
         activeFocusTasks.first { $0.status == .pending }
     }
 
+    private var appDisplayName: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ??
+            "MonoList"
+    }
+
     private var todayCompletedRoots: [TaskItem] {
         store.completedTasks(on: currentDate).filter { $0.parentID == nil }
     }
@@ -103,7 +108,7 @@ struct HomeView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("MonoList")
+                Text(appDisplayName)
                     .font(.system(size: 17, weight: .semibold))
                 Text(currentDate, format: .dateTime.year().month().day().weekday())
                     .font(.system(size: 12))

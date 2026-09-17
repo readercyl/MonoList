@@ -10,19 +10,23 @@ MonoList 是一款常驻 macOS 菜单栏的轻量待办工具。
 
 无需安装完整 Xcode。
 
+直接执行 `build-local.sh` 生成的是可点击测试的 `MonoList 开发版`，与
+`/Applications/MonoList.app` 正式版使用不同应用身份。正式版安装包由
+`package-dmg.sh` 显式使用 release 构建身份生成。
+
 ## 本地构建
 
 ```bash
 bash scripts/build-local.sh
 bash scripts/check-app-launch.sh
-open build/local/MonoList.app
+open "build/local/MonoList 开发版.app"
 ```
 
 构建产物统一存放在：
 
 ```text
 build/
-├── local/MonoList.app
+├── local/MonoList 开发版.app
 └── release/MonoList-vX.Y.Z.dmg
 ```
 

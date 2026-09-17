@@ -46,7 +46,11 @@ bash scripts/check-project-integrity.sh
 bash scripts/check-app-updater.sh
 bash scripts/check-update-installer.sh
 MONOLIST_APP_VERSION="$VERSION" bash scripts/package-dmg.sh >/dev/null
-bash scripts/check-app-launch.sh
+bash scripts/check-app-launch.sh \
+  build/local/MonoList.app \
+  com.qingcheng.monolist.mac \
+  com.qingcheng.monolist.menubar.v2 \
+  MonoList
 bash scripts/check-release-signature.sh
 bash scripts/check-dmg-layout.sh "$DMG_PATH"
 

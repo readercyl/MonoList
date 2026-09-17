@@ -11,6 +11,11 @@ final class WindowCoordinator {
     static let homeWindowMinimumSize = NSSize(width: 760, height: 520)
     static let homeWindowAutosaveName = "MonoList.HomeWindow"
 
+    static var appDisplayName: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ??
+            "MonoList"
+    }
+
     static func requiresScrolling(contentHeight: CGFloat) -> Bool {
         true
     }
@@ -313,7 +318,7 @@ final class WindowCoordinator {
             backing: .buffered,
             defer: false
         )
-        window.title = "MonoList 控制台"
+        window.title = "\(Self.appDisplayName) 控制台"
         window.titleVisibility = .hidden
         let titleController = NSTitlebarAccessoryViewController()
         titleController.layoutAttribute = .left
@@ -374,7 +379,7 @@ final class WindowCoordinator {
             backing: .buffered,
             defer: false
         )
-        window.title = "MonoList"
+        window.title = Self.appDisplayName
         window.titleVisibility = .visible
         window.isReleasedWhenClosed = false
         window.isRestorable = true

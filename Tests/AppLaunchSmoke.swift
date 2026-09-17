@@ -17,6 +17,12 @@ struct AppLaunchSmoke {
     static func main() throws {
         let appURL = URL(fileURLWithPath: CommandLine.arguments[1])
         let iconPNGURL = URL(fileURLWithPath: CommandLine.arguments[2])
+        let expectedBundleID = CommandLine.arguments.dropFirst(3).first ??
+            "com.qingcheng.monolist.dev"
+        let expectedHelperBundleID = CommandLine.arguments.dropFirst(4).first ??
+            "com.qingcheng.monolist.dev.menubar"
+        let expectedDisplayName = CommandLine.arguments.dropFirst(5).first ??
+            "MonoList 开发版"
         let contentsURL = appURL.appendingPathComponent("Contents")
         let executableURL = contentsURL.appendingPathComponent("MacOS/MonoList")
         let helperURL = contentsURL.appendingPathComponent(
@@ -37,8 +43,10 @@ struct AppLaunchSmoke {
             throw SmokeFailure.failed("Info.plist 格式无效")
         }
 
-        try require(plist["CFBundleIdentifier"] as? String == "com.qingcheng.monolist.mac",
+        try require(plist["CFBundleIdentifier"] as? String == expectedBundleID,
                     "Bundle ID 不正确")
+        try require(plist["CFBundleDisplayName"] as? String == expectedDisplayName,
+                    "应用显示名称不正确")
         try require(plist["CFBundleExecutable"] as? String == "MonoList",
                     "可执行文件名称不正确")
         try require(plist["CFBundleIconFile"] as? String == "AppIcon.icns",
@@ -64,8 +72,7 @@ struct AppLaunchSmoke {
             throw SmokeFailure.failed("菜单栏服务 Info.plist 格式无效")
         }
         try require(
-            helperPlist["CFBundleIdentifier"] as? String ==
-                "com.qingcheng.monolist.menubar.v2",
+            helperPlist["CFBundleIdentifier"] as? String == expectedHelperBundleID,
             "菜单栏服务必须使用新的独立 Bundle ID"
         )
         try require(helperPlist["LSUIElement"] as? Bool == true,

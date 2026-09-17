@@ -40,6 +40,24 @@ for file in "${required_files[@]}"; do
   }
 done
 
+if ! rg -q 'BUILD_FLAVOR=.*development' "$ROOT_DIR/scripts/build-local.sh" ||
+   ! rg -q 'MonoList 开发版\.app' "$ROOT_DIR/scripts/build-local.sh" ||
+   ! rg -q 'com\.qingcheng\.monolist\.dev' "$ROOT_DIR/scripts/build-local.sh"; then
+  echo "直接构建必须生成与正式版明确区分的 MonoList 开发版。" >&2
+  exit 1
+fi
+
+if ! rg -q 'MONOLIST_BUILD_FLAVOR=release' "$ROOT_DIR/scripts/package-dmg.sh" ||
+   ! rg -q 'com\.qingcheng\.monolist\.mac' "$ROOT_DIR/scripts/build-local.sh"; then
+  echo "正式打包必须显式使用 MonoList release 身份。" >&2
+  exit 1
+fi
+
+if rg -q 'open[[:space:]].*build/local/MonoList\.app' "$ROOT_DIR/README.md"; then
+  echo "README 不能引导直接启动未区分身份的开发构建。" >&2
+  exit 1
+fi
+
 while IFS= read -r script_path; do
   [[ -f "$ROOT_DIR/$script_path" ]] || {
     echo "README 或发布流程引用了不存在的脚本：$script_path" >&2
