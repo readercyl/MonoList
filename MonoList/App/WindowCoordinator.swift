@@ -7,6 +7,9 @@ final class WindowCoordinator {
     static let mainPanelMinimumHeight: CGFloat = 106
     static let mainPanelMaximumHeight: CGFloat = 447
     static let settingsWindowWidth: CGFloat = 430
+    static let homeWindowDefaultSize = NSSize(width: 1000, height: 720)
+    static let homeWindowMinimumSize = NSSize(width: 760, height: 520)
+    static let homeWindowAutosaveName = "MonoList.HomeWindow"
 
     static func requiresScrolling(contentHeight: CGFloat) -> Bool {
         true
@@ -55,6 +58,7 @@ final class WindowCoordinator {
     private var pendingResizeWorkItem: DispatchWorkItem?
     private weak var previousApplication: NSRunningApplication?
     private var settingsWindow: NSWindow?
+    private var homeWindow: NSWindow?
     private var settings: AppSettings?
     private var reminderScheduler: ReminderScheduler?
     private var loginItemController: LoginItemController?
@@ -70,6 +74,10 @@ final class WindowCoordinator {
 
     var isSettingsVisible: Bool {
         settingsWindow?.isVisible == true
+    }
+
+    var isHomeVisible: Bool {
+        homeWindow?.isVisible == true
     }
 
     init(taskStore: TaskStore, focusStore: FocusStore) {
@@ -348,6 +356,77 @@ final class WindowCoordinator {
         window.makeKeyAndOrderFront(nil)
     }
 
+    func showHome() {
+        closeMainPanel()
+
+        if let homeWindow {
+            NSApp.activate(ignoringOtherApps: true)
+            homeWindow.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let window = NSWindow(
+            contentRect: NSRect(
+                origin: .zero,
+                size: Self.homeWindowDefaultSize
+            ),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "MonoList"
+        window.titleVisibility = .visible
+        window.isReleasedWhenClosed = false
+        window.isRestorable = true
+
+        let hostingView = NSHostingView(
+            rootView: HomeView(
+                store: taskStore,
+                focusStore: focusStore,
+                onOpenSettings: { [weak self] in
+                    self?.showSettings()
+                },
+                onFocusInteraction: { [weak self] in
+                    self?.onFocusInteraction?()
+                },
+                onWindowReady: { [weak window] in
+                    DispatchQueue.main.async {
+                        window?.contentMinSize = Self.homeWindowMinimumSize
+                        window?.minSize = NSSize(
+                            width: Self.homeWindowMinimumSize.width,
+                            height: Self.homeWindowMinimumSize.height + 32
+                        )
+                    }
+                }
+            )
+        )
+        hostingView.autoresizingMask = [.width, .height]
+        hostingView.frame = NSRect(origin: .zero, size: Self.homeWindowDefaultSize)
+        hostingView.sizingOptions = []
+        window.contentView = hostingView
+        window.contentMinSize = Self.homeWindowMinimumSize
+        window.minSize = NSSize(
+            width: Self.homeWindowMinimumSize.width,
+            height: Self.homeWindowMinimumSize.height + 32
+        )
+        homeWindow = window
+
+        let restoredFrame = window.setFrameUsingName(Self.homeWindowAutosaveName)
+        window.setFrameAutosaveName(Self.homeWindowAutosaveName)
+        if !restoredFrame {
+            window.center()
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak window] in
+            window?.contentMinSize = Self.homeWindowMinimumSize
+            window?.minSize = NSSize(
+                width: Self.homeWindowMinimumSize.width,
+                height: Self.homeWindowMinimumSize.height + 32
+            )
+        }
+    }
+
     private func makeMainPanel() -> MainPanel {
         weak var panelReference: MainPanel?
         let hostingView = MainPanelHostingView(
@@ -358,9 +437,9 @@ final class WindowCoordinator {
                 onClose: { [weak self] in
                     self?.closeMainPanel(restoringFocus: true)
                 },
-                onOpenSettings: { [weak self] in
+                onOpenHome: { [weak self] in
                     self?.closeMainPanel()
-                    self?.onOpenSettings?()
+                    self?.showHome()
                 },
                 onFocusInteraction: { [weak self] in
                     self?.onFocusInteraction?()

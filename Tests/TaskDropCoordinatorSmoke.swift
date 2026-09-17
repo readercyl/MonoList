@@ -92,6 +92,27 @@ struct TaskDropCoordinatorSmoke {
         coordinator.hover(group: .shortTerm, before: nil)
         try coordinator.performDrop(sourceID: long.id, store: store)
         precondition(store.shortTermTasks.map(\.id) == [long.id])
+
+        let hierarchyStore = TaskStore(
+            fileURL: directory.appendingPathComponent("hierarchy.json")
+        )
+        let parent = try hierarchyStore.add(text: "父任务")
+        let childOne = try hierarchyStore.add(
+            text: "子任务一",
+            parentID: parent.id
+        )
+        let childTwo = try hierarchyStore.add(
+            text: "子任务二",
+            parentID: parent.id
+        )
+        coordinator.beginDragging(task: childTwo)
+        coordinator.hover(
+            group: .shortTerm,
+            before: childOne.id,
+            parentID: parent.id
+        )
+        try coordinator.performDrop(sourceID: childTwo.id, store: hierarchyStore)
+        precondition(hierarchyStore.children(of: parent.id).map(\.id) == [childTwo.id, childOne.id])
         print("Task drop coordinator smoke passed.")
     }
 }

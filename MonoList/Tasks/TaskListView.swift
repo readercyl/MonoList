@@ -8,7 +8,7 @@ struct TaskListView: View {
     @ObservedObject var focusStore: FocusStore
     @ObservedObject var draftState: TaskDraftState
     let onClose: () -> Void
-    let onOpenSettings: () -> Void
+    let onOpenHome: () -> Void
     let onFocusInteraction: () -> Void
     let onHeightChanged: (CGFloat) -> Void
 
@@ -24,6 +24,7 @@ struct TaskListView: View {
     @State private var draftScrollRequest = UUID()
     @State private var taskRowHeights: [UUID: CGFloat] = [:]
     @State private var draftRowHeight: CGFloat?
+    @State private var collapsedTaskIDs: Set<UUID> = []
     @State private var showsOtherTasks = true
     @State private var rendersOtherTasks = true
     @State private var otherTasksTransitionID = UUID()
@@ -39,7 +40,7 @@ struct TaskListView: View {
         focusStore: FocusStore,
         draftState: TaskDraftState,
         onClose: @escaping () -> Void,
-        onOpenSettings: @escaping () -> Void,
+        onOpenHome: @escaping () -> Void,
         onFocusInteraction: @escaping () -> Void,
         onHeightChanged: @escaping (CGFloat) -> Void
     ) {
@@ -47,7 +48,7 @@ struct TaskListView: View {
         self.focusStore = focusStore
         self.draftState = draftState
         self.onClose = onClose
-        self.onOpenSettings = onOpenSettings
+        self.onOpenHome = onOpenHome
         self.onFocusInteraction = onFocusInteraction
         self.onHeightChanged = onHeightChanged
         let startsWithOtherTasks = !focusStore.isActive()
@@ -69,7 +70,7 @@ struct TaskListView: View {
 
     private var completedGroups: [CompletedGroup] {
         let calendar = Calendar.current
-        let grouped = Dictionary(grouping: visibleOlderCompleted) {
+        let grouped = Dictionary(grouping: visibleOlderCompleted.filter { $0.parentID == nil }) {
             calendar.startOfDay(for: $0.completedAt ?? .distantPast)
         }
         return grouped
@@ -99,7 +100,8 @@ struct TaskListView: View {
     }
 
     private var focusSelectableTasks: [TaskItem] {
-        store.shortTermTasks + store.longTermTasks
+        store.topLevelPendingTasks(in: .shortTerm) +
+            store.topLevelPendingTasks(in: .longTerm)
     }
 
     private var otherPendingTasks: [TaskItem] {
@@ -396,12 +398,12 @@ struct TaskListView: View {
 
             Button {
                 commitDraft()
-                onOpenSettings()
+                onOpenHome()
             } label: {
-                HeaderIconLabel(systemName: "gearshape")
+                HeaderIconLabel(systemName: "house")
             }
             .buttonStyle(HeaderIconButtonStyle())
-            .help("打开控制台")
+            .help("打开主页")
         }
         .padding(.leading, 14)
         .padding(.trailing, 9)
@@ -809,7 +811,9 @@ struct TaskListView: View {
 
     private func tasks(in group: TaskGroup) -> [TaskItem] {
         let groupTasks = group == .shortTerm ? store.shortTermTasks : store.longTermTasks
-        return groupTasks.filter { !activeFocusIDs.contains($0.id) }
+        return groupTasks.filter {
+            $0.parentID == nil && !activeFocusIDs.contains($0.id)
+        }
     }
 
     @ViewBuilder
@@ -819,7 +823,7 @@ struct TaskListView: View {
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
-            Text("\(groupTasks.count)")
+            Text("\(store.pendingTasks.filter { $0.group == group }.count)")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.tertiary)
             Spacer()
@@ -870,7 +874,7 @@ struct TaskListView: View {
                 onMoveUp: performAnimated { try store.move(id: item.id, by: -1) },
                 onMoveDown: performAnimated { try store.move(id: item.id, by: 1) },
                 onInsertAfter: {
-                    focusDraft(after: item.id, in: item.group)
+                    focusDraft(after: item.id, in: item.group, parentID: item.parentID)
                 },
                 onUpdateReminder: perform { reminder in
                     try store.updateReminder(id: item.id, reminder: reminder)
@@ -887,7 +891,27 @@ struct TaskListView: View {
                 onSelect: { selectTask(item.id) },
                 onEditingChanged: { editing in
                     editingTaskID = editing ? item.id : nil
-                }
+                },
+                hasSubtasks: !store.children(of: item.id).isEmpty,
+                isExpanded: !collapsedTaskIDs.contains(item.id),
+                onToggleSubtasks: { toggleSubtasks(item.id) },
+                onAddSubtask: { beginSubtaskDraft(for: item) },
+                canAddSubtask: true,
+                onIndent: {
+                    performHierarchyChange {
+                        try store.indent(id: item.id)
+                        return item.parentID == nil &&
+                            tasks(in: item.group).first?.id != item.id
+                    }
+                },
+                onOutdent: {
+                    performHierarchyChange {
+                        guard item.parentID != nil else { return false }
+                        try store.outdent(id: item.id)
+                        return true
+                    }
+                },
+                subtaskProgressText: store.subtaskProgressText(for: item.id)
             )
             .matchedGeometryEffect(id: item.id, in: taskMovementNamespace)
             .transition(.opacity)
@@ -947,14 +971,163 @@ struct TaskListView: View {
                         : nil
                 )
             }
+
+            if !collapsedTaskIDs.contains(item.id) {
+                let children = store.children(of: item.id)
+                ForEach(Array(children.enumerated()), id: \.element.id) { index, child in
+                    if child.status == .pending {
+                        pendingChildRow(
+                            child,
+                            parentID: item.id,
+                            upperBeforeID: child.id,
+                            lowerBeforeID: children.indices.contains(index + 1)
+                                ? children[index + 1].id
+                                : nil
+                        )
+                    } else {
+                        completedRow(child, indentationLevel: 1)
+                    }
+                }
+                if draftState.isPresented && draftState.parentID == item.id {
+                    draftRow(indentationLevel: 1)
+                        .transition(.opacity)
+                }
+            }
         }
-        if draftState.isPresented && draftState.group == group && draftState.afterID == nil {
+        if draftState.isPresented && draftState.group == group &&
+            draftState.parentID == nil && draftState.afterID == nil {
             draftDropRow(group: group, beforeID: nil)
         }
     }
 
+    private func pendingChildRow(
+        _ item: TaskItem,
+        parentID: UUID? = nil,
+        upperBeforeID: UUID? = nil,
+        lowerBeforeID: UUID? = nil
+    ) -> some View {
+        let targetParentID = parentID ?? item.parentID
+        return TaskRowView(
+            item: item,
+            onSave: { text in
+                performAction { try store.updateText(id: item.id, text: text) }
+            },
+            onComplete: { text in
+                let completed = performAnimatedAction {
+                    try store.complete(id: item.id, finalText: text)
+                }
+                return completed
+            },
+            onDelete: {
+                performAnimatedAction { try store.delete(id: item.id) }
+                if selectedTaskID == item.id {
+                    selectedTaskID = nil
+                }
+            },
+            onMoveUp: performAnimated { try store.move(id: item.id, by: -1) },
+            onMoveDown: performAnimated { try store.move(id: item.id, by: 1) },
+            onInsertAfter: {
+                focusDraft(after: item.id, in: item.group, parentID: item.parentID)
+            },
+            onUpdateReminder: perform { reminder in
+                try store.updateReminder(id: item.id, reminder: reminder)
+            },
+            onChangeGroup: performAnimated {
+                try store.move(
+                    id: item.id,
+                    to: item.group == .shortTerm ? .longTerm : .shortTerm,
+                    before: nil
+                )
+            },
+            isSelected: selectedTaskID == item.id,
+            onSelect: { selectTask(item.id) },
+            onEditingChanged: { editing in
+                editingTaskID = editing ? item.id : nil
+            },
+            indentationLevel: 1,
+            onIndent: { false },
+            onOutdent: {
+                performHierarchyChange {
+                    try store.outdent(id: item.id)
+                    return true
+                }
+            }
+        )
+        .matchedGeometryEffect(id: item.id, in: taskMovementNamespace)
+        .transition(.opacity)
+        .overlay(alignment: .top) {
+            if dropCoordinator.target == TaskDropTarget(
+                group: item.group,
+                beforeID: item.id,
+                parentID: targetParentID
+            ) {
+                TaskDragInsertionIndicator()
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if lowerBeforeID == nil,
+               dropCoordinator.target == TaskDropTarget(
+                   group: item.group,
+                   beforeID: nil,
+                   parentID: targetParentID
+               ) {
+                TaskDragInsertionIndicator()
+            }
+        }
+        .onDrag {
+            dropCoordinator.beginDragging(task: item)
+            return NSItemProvider(object: item.id.uuidString as NSString)
+        } preview: {
+            TaskDragPreview(text: item.text)
+        }
+        .onDrop(
+            of: [UTType.text],
+            delegate: TaskGroupDropDelegate(
+                group: item.group,
+                upperBeforeID: upperBeforeID,
+                lowerBeforeID: lowerBeforeID,
+                rowHeight: taskRowHeights[item.id] ?? 36,
+                highlightsGroupHeader: false,
+                parentID: targetParentID,
+                sessionID: dropCoordinator.sessionID,
+                store: store,
+                coordinator: dropCoordinator,
+                errorMessage: $errorMessage
+            )
+        )
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: TaskRowHeightPreferenceKey.self,
+                    value: [item.id: proxy.size.height]
+                )
+            }
+        }
+    }
+
+    private func toggleSubtasks(_ id: UUID) {
+        withAnimation(layoutAnimation) {
+            if collapsedTaskIDs.contains(id) {
+                collapsedTaskIDs.remove(id)
+            } else {
+                collapsedTaskIDs.insert(id)
+            }
+        }
+    }
+
+    private func beginSubtaskDraft(for parent: TaskItem) {
+        commitDraft()
+        collapsedTaskIDs.remove(parent.id)
+        let lastChild = store.children(of: parent.id).last
+        focusDraft(
+            after: lastChild?.id,
+            in: parent.group,
+            parentID: parent.id
+        )
+    }
+
     private func draftDropRow(group: TaskGroup, beforeID: UUID?) -> some View {
-        draftRow
+        draftRow()
             .id("task-draft-row")
             .transition(.opacity)
             .onDrop(
@@ -973,8 +1146,12 @@ struct TaskListView: View {
             )
     }
 
-    private var draftRow: some View {
+    private func draftRow(indentationLevel: Int = 0) -> some View {
         HStack(alignment: .center, spacing: 9) {
+            Color.clear.frame(
+                width: indentationLevel == 0 ? 0 : 20,
+                height: 28
+            )
             Image(systemName: "circle")
                 .font(.system(size: 18))
                 .foregroundStyle(.tertiary)
@@ -982,7 +1159,9 @@ struct TaskListView: View {
             TaskTextEditor(
                 text: $draftState.text,
                 isFocused: $draftFocused,
-                onSubmit: continueDraft
+                onSubmit: continueDraft,
+                onIndent: { indentDraft() },
+                onOutdent: { outdentDraft() }
             )
                 .onAppear {
                     if !store.pendingTasks.isEmpty {
@@ -999,7 +1178,8 @@ struct TaskListView: View {
                 .padding(.vertical, 5)
             Color.clear.frame(width: 28, height: 28)
         }
-        .padding(.horizontal, 8)
+        .padding(.leading, CGFloat(indentationLevel) * 21 + 8)
+        .padding(.trailing, 8)
         .padding(.vertical, 3)
         .background(
             Color.primary.opacity(0.03),
@@ -1037,8 +1217,8 @@ struct TaskListView: View {
             .padding(.horizontal, 10)
             .frame(height: 35)
 
-            ForEach(todayCompleted) { item in
-                completedRow(item)
+            ForEach(todayCompleted.filter { $0.parentID == nil }) { item in
+                completedTree(item)
             }
 
             if showsOlderCompleted {
@@ -1050,14 +1230,32 @@ struct TaskListView: View {
                         .padding(.horizontal, 10)
                         .frame(height: 19)
                     ForEach(group.tasks) { item in
-                        completedRow(item)
+                        completedTree(item)
                     }
                 }
             }
         }
     }
 
-    private func completedRow(_ item: TaskItem) -> some View {
+    private func completedTree(_ item: TaskItem) -> some View {
+        VStack(spacing: 1) {
+            completedRow(item, indentationLevel: 0)
+            if !collapsedTaskIDs.contains(item.id) {
+                ForEach(store.children(of: item.id)) { child in
+                    if child.status == .pending {
+                        pendingChildRow(child)
+                    } else {
+                        completedRow(child, indentationLevel: 1)
+                    }
+                }
+            }
+        }
+    }
+
+    private func completedRow(
+        _ item: TaskItem,
+        indentationLevel: Int = 0
+    ) -> some View {
         CompletedTaskRow(
             item: item,
             onRestore: {
@@ -1067,7 +1265,11 @@ struct TaskListView: View {
             onDelete: {
                 performAnimatedAction { try store.delete(id: item.id) }
                 if activeFocusIDs.contains(item.id) { onFocusInteraction() }
-            }
+            },
+            indentationLevel: indentationLevel,
+            hasSubtasks: !store.children(of: item.id).isEmpty,
+            isExpanded: !collapsedTaskIDs.contains(item.id),
+            onToggleSubtasks: { toggleSubtasks(item.id) }
         )
         .matchedGeometryEffect(id: item.id, in: taskMovementNamespace)
         .transition(.opacity)
@@ -1212,17 +1414,39 @@ struct TaskListView: View {
         NSApp.keyWindow?.makeFirstResponder(nil)
     }
 
-    private func focusDraft(after id: UUID?, in group: TaskGroup = .shortTerm) {
+    private func focusDraft(after id: UUID?, in group: TaskGroup = .shortTerm, parentID: UUID? = nil) {
         selectedTaskID = nil
         editingTaskID = nil
         draftRowHeight = nil
-        draftState.present(after: id, in: group)
+        draftState.present(after: id, in: group, parentID: parentID)
         draftScrollRequest = UUID()
         DispatchQueue.main.async {
             selectedTaskID = nil
             editingTaskID = nil
             draftFocused = true
         }
+    }
+
+    private func indentDraft() -> Bool {
+        guard draftState.parentID == nil else { return false }
+        let roots = tasks(in: draftState.group)
+        guard let afterID = draftState.afterID,
+              let index = roots.firstIndex(where: { $0.id == afterID }),
+              index > 0 else {
+            return false
+        }
+        let parent = roots[index - 1]
+        draftState.parentID = parent.id
+        draftState.afterID = store.children(of: parent.id).last?.id
+        collapsedTaskIDs.remove(parent.id)
+        return true
+    }
+
+    private func outdentDraft() -> Bool {
+        guard let parentID = draftState.parentID else { return false }
+        draftState.parentID = nil
+        draftState.afterID = parentID
+        return true
     }
 
     static func additionalLines(for text: String) -> Int {
@@ -1352,6 +1576,15 @@ struct TaskListView: View {
             try action()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func performHierarchyChange(_ action: () throws -> Bool) -> Bool {
+        do {
+            return try action()
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -1518,12 +1751,48 @@ private struct CompletedTaskRow: View {
     let item: TaskItem
     let onRestore: () -> Void
     let onDelete: () -> Void
+    let indentationLevel: Int
+    let hasSubtasks: Bool
+    let isExpanded: Bool
+    let onToggleSubtasks: () -> Void
 
     @State private var isHovered = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    init(
+        item: TaskItem,
+        onRestore: @escaping () -> Void,
+        onDelete: @escaping () -> Void,
+        indentationLevel: Int = 0,
+        hasSubtasks: Bool = false,
+        isExpanded: Bool = true,
+        onToggleSubtasks: @escaping () -> Void = {}
+    ) {
+        self.item = item
+        self.onRestore = onRestore
+        self.onDelete = onDelete
+        self.indentationLevel = indentationLevel
+        self.hasSubtasks = hasSubtasks
+        self.isExpanded = isExpanded
+        self.onToggleSubtasks = onToggleSubtasks
+    }
+
     var body: some View {
         HStack(alignment: .center, spacing: 9) {
+            if hasSubtasks {
+                Button(action: onToggleSubtasks) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .frame(width: 20, height: 28)
+                }
+                .buttonStyle(.plain)
+                .help(isExpanded ? "隐藏子任务" : "展开子任务")
+                .accessibilityLabel(isExpanded ? "隐藏子任务" : "展开子任务")
+            } else if indentationLevel > 0 {
+                Color.clear.frame(width: 20, height: 28)
+            }
             Button(action: onRestore) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 18))
@@ -1548,7 +1817,8 @@ private struct CompletedTaskRow: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 8)
+        .padding(.leading, CGFloat(indentationLevel) * 21 + 8)
+        .padding(.trailing, 8)
         .padding(.vertical, 3)
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
@@ -1591,10 +1861,35 @@ private struct TaskGroupDropDelegate: DropDelegate {
     let lowerBeforeID: UUID?
     let rowHeight: CGFloat
     let highlightsGroupHeader: Bool
+    let parentID: UUID?
     let sessionID: UUID?
     let store: TaskStore
     let coordinator: TaskDropCoordinator
     @Binding var errorMessage: String?
+
+    init(
+        group: TaskGroup,
+        upperBeforeID: UUID?,
+        lowerBeforeID: UUID?,
+        rowHeight: CGFloat,
+        highlightsGroupHeader: Bool,
+        parentID: UUID? = nil,
+        sessionID: UUID?,
+        store: TaskStore,
+        coordinator: TaskDropCoordinator,
+        errorMessage: Binding<String?>
+    ) {
+        self.group = group
+        self.upperBeforeID = upperBeforeID
+        self.lowerBeforeID = lowerBeforeID
+        self.rowHeight = rowHeight
+        self.highlightsGroupHeader = highlightsGroupHeader
+        self.parentID = parentID
+        self.sessionID = sessionID
+        self.store = store
+        self.coordinator = coordinator
+        self._errorMessage = errorMessage
+    }
 
     func dropEntered(info: DropInfo) {
         updateTarget(info)
@@ -1602,6 +1897,9 @@ private struct TaskGroupDropDelegate: DropDelegate {
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
         updateTarget(info)
+        guard acceptsDrop else {
+            return DropProposal(operation: .forbidden)
+        }
         return DropProposal(operation: .move)
     }
 
@@ -1613,7 +1911,11 @@ private struct TaskGroupDropDelegate: DropDelegate {
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        guard let sessionID else { return false }
+        guard let sessionID,
+              let sourceTask = coordinator.sourceTask,
+              accepts(sourceTask: sourceTask) else {
+            return false
+        }
         updateTarget(info)
         guard let target = coordinator.finishDrop(sessionID: sessionID) else {
             coordinator.clearTarget(sessionID: sessionID)
@@ -1635,7 +1937,8 @@ private struct TaskGroupDropDelegate: DropDelegate {
                         try store.move(
                             id: sourceID,
                             to: target.group,
-                            before: target.beforeID
+                            before: target.beforeID,
+                            parentID: target.parentID
                         )
                     }
                 } catch {
@@ -1654,7 +1957,8 @@ private struct TaskGroupDropDelegate: DropDelegate {
             lowerBeforeID: lowerBeforeID,
             locationY: info.location.y,
             rowHeight: rowHeight,
-            highlightsGroupHeader: highlightsGroupHeader
+            highlightsGroupHeader: highlightsGroupHeader,
+            parentID: parentID
         )
         guard coordinator.target != target else { return }
         withAnimation(.easeOut(duration: 0.16)) {
@@ -1662,8 +1966,21 @@ private struct TaskGroupDropDelegate: DropDelegate {
                 group: target.group,
                 before: target.beforeID,
                 highlightsGroupHeader: target.highlightsGroupHeader,
+                parentID: target.parentID,
                 sessionID: sessionID
             )
         }
+    }
+
+    private var acceptsDrop: Bool {
+        guard let sourceTask = coordinator.sourceTask else { return true }
+        return accepts(sourceTask: sourceTask)
+    }
+
+    private func accepts(sourceTask: TaskItem) -> Bool {
+        if let parentID {
+            return sourceTask.parentID == parentID && sourceTask.group == group
+        }
+        return sourceTask.parentID == nil
     }
 }

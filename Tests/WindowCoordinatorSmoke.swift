@@ -207,6 +207,24 @@ struct WindowCoordinatorSmoke {
         let pasteEvent = commandKeyEvent(character: "v", keyCode: 9)
         precondition(directEditor.performKeyEquivalent(with: pasteEvent))
         precondition(directEditor.string == "可以复制的待办")
+        var outdentCount = 0
+        let hierarchyEditor = TaskSubmitTextView()
+        hierarchyEditor.string = "子任务"
+        hierarchyEditor.setSelectedRange(NSRange(location: 0, length: 0))
+        hierarchyEditor.onOutdent = {
+            outdentCount += 1
+            return true
+        }
+        hierarchyEditor.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
+        precondition(outdentCount == 1)
+        precondition(hierarchyEditor.string == "子任务")
+        var indentCount = 0
+        hierarchyEditor.onIndent = {
+            indentCount += 1
+            return true
+        }
+        hierarchyEditor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+        precondition(indentCount == 1)
         let configuredEditorHost = NSHostingView(
             rootView: TaskEditorSizingProbe(text: "")
         )
@@ -448,6 +466,55 @@ struct WindowCoordinatorSmoke {
         }
         coordinator.closeMainPanel(animated: false)
         precondition(!coordinator.isMainPanelVisible)
+
+        let windowsBeforeHome = Set(NSApp.windows.map(ObjectIdentifier.init))
+        coordinator.showHome()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        guard let homeWindow = NSApp.windows.first(where: {
+            !windowsBeforeHome.contains(ObjectIdentifier($0)) && $0.isVisible
+        }) else {
+            throw CocoaError(.coderInvalidValue)
+        }
+        guard homeWindow.contentView is NSHostingView<HomeView> else {
+            throw CocoaError(.coderInvalidValue)
+        }
+        precondition(homeWindow.styleMask.contains(.resizable))
+        precondition(homeWindow.contentMinSize == WindowCoordinator.homeWindowMinimumSize)
+        coordinator.showHome()
+        precondition(coordinator.isHomeVisible)
+        precondition(
+            NSApp.windows.filter(\.isVisible).contains {
+                ObjectIdentifier($0) == ObjectIdentifier(homeWindow)
+            }
+        )
+        let frameAutosaveKey = "NSWindow Frame \(WindowCoordinator.homeWindowAutosaveName)"
+        let previousAutosavedFrame = UserDefaults.standard.object(forKey: frameAutosaveKey)
+        defer {
+            if let previousAutosavedFrame {
+                UserDefaults.standard.set(previousAutosavedFrame, forKey: frameAutosaveKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: frameAutosaveKey)
+            }
+        }
+        let rememberedFrame = NSRect(x: 123, y: 137, width: 820, height: 570)
+        homeWindow.setFrame(rememberedFrame, display: false)
+        homeWindow.close()
+        precondition(!coordinator.isHomeVisible)
+
+        let restoredCoordinator = WindowCoordinator(
+            taskStore: store,
+            focusStore: focusStore
+        )
+        let windowsBeforeRestoredHome = Set(NSApp.windows.map(ObjectIdentifier.init))
+        restoredCoordinator.showHome()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        guard let restoredHomeWindow = NSApp.windows.first(where: {
+            !windowsBeforeRestoredHome.contains(ObjectIdentifier($0)) && $0.isVisible
+        }) else {
+            throw CocoaError(.coderInvalidValue)
+        }
+        precondition(restoredHomeWindow.frame.size == rememberedFrame.size)
+        restoredHomeWindow.close()
 
         let focusDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("MonoListFocusWindowTests-\(UUID().uuidString)")

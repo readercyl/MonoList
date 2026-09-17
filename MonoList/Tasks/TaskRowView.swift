@@ -14,6 +14,15 @@ struct TaskRowView: View {
     let isSelected: Bool
     let onSelect: () -> Void
     let onEditingChanged: (Bool) -> Void
+    let indentationLevel: Int
+    let hasSubtasks: Bool
+    let isExpanded: Bool
+    let onToggleSubtasks: () -> Void
+    let onAddSubtask: (() -> Void)?
+    let canAddSubtask: Bool
+    let onIndent: (() -> Bool)?
+    let onOutdent: (() -> Bool)?
+    let subtaskProgressText: String?
 
     @State private var text: String
     @State private var originalText: String
@@ -37,7 +46,16 @@ struct TaskRowView: View {
         focusOrder: Int? = nil,
         isSelected: Bool,
         onSelect: @escaping () -> Void,
-        onEditingChanged: @escaping (Bool) -> Void
+        onEditingChanged: @escaping (Bool) -> Void,
+        indentationLevel: Int = 0,
+        hasSubtasks: Bool = false,
+        isExpanded: Bool = true,
+        onToggleSubtasks: @escaping () -> Void = {},
+        onAddSubtask: (() -> Void)? = nil,
+        canAddSubtask: Bool = false,
+        onIndent: (() -> Bool)? = nil,
+        onOutdent: (() -> Bool)? = nil,
+        subtaskProgressText: String? = nil
     ) {
         self.item = item
         self.onSave = onSave
@@ -52,12 +70,23 @@ struct TaskRowView: View {
         self.isSelected = isSelected
         self.onSelect = onSelect
         self.onEditingChanged = onEditingChanged
+        self.indentationLevel = indentationLevel
+        self.hasSubtasks = hasSubtasks
+        self.isExpanded = isExpanded
+        self.onToggleSubtasks = onToggleSubtasks
+        self.onAddSubtask = onAddSubtask
+        self.canAddSubtask = canAddSubtask
+        self.onIndent = onIndent
+        self.onOutdent = onOutdent
+        self.subtaskProgressText = subtaskProgressText
         _text = State(initialValue: item.text)
         _originalText = State(initialValue: item.text)
     }
 
     var body: some View {
         HStack(alignment: .center, spacing: 9) {
+            hierarchyControl
+
             if let focusOrder {
                 Button {
                     beginCompletion()
@@ -86,11 +115,14 @@ struct TaskRowView: View {
                     if isEditingMode {
                         TaskTextEditor(
                             text: $text,
-                            isFocused: $isEditorFocused
-                        ) {
-                            finishEditing()
-                            onInsertAfter()
-                        }
+                            isFocused: $isEditorFocused,
+                            onSubmit: {
+                                finishEditing()
+                                onInsertAfter()
+                            },
+                            onIndent: onIndent,
+                            onOutdent: onOutdent
+                        )
                             .onAppear {
                                 DispatchQueue.main.async {
                                     isEditorFocused = true
@@ -111,6 +143,7 @@ struct TaskRowView: View {
                     }
                 }
                 if !isEditingMode {
+                    subtaskProgressLine
                     reminderStatusLine
                         .transition(.opacity)
                 }
@@ -135,8 +168,24 @@ struct TaskRowView: View {
             }
             .buttonStyle(.plain)
             .help("删除")
+
+            if canAddSubtask, let onAddSubtask {
+                Button(action: onAddSubtask) {
+                    Image(systemName: "plus")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .opacity(isHovered || isSelected ? 1 : 0)
+                        .animation(
+                            reduceMotion ? nil : .easeOut(duration: 0.16),
+                            value: isHovered || isSelected
+                        )
+                }
+                .buttonStyle(.plain)
+                .help("添加子任务")
+            }
         }
-        .padding(.horizontal, 8)
+        .padding(.leading, CGFloat(indentationLevel) * 21 + 8)
+        .padding(.trailing, 8)
         .padding(.vertical, 3)
         .background(
             isSelected && !isEditingMode ? Color.primary.opacity(0.055) : .clear,
@@ -206,6 +255,42 @@ struct TaskRowView: View {
                     isReminderPopoverPresented = false
                 }
             )
+        }
+    }
+
+    private var hierarchyControl: some View {
+        Group {
+            if hasSubtasks {
+                Button(action: onToggleSubtasks) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .frame(width: 20, height: 28)
+                }
+                .buttonStyle(.plain)
+                .help(isExpanded ? "隐藏子任务" : "展开子任务")
+                .accessibilityLabel(isExpanded ? "隐藏子任务" : "展开子任务")
+            } else {
+                Color.clear.frame(
+                    width: indentationLevel == 0 ? 0 : 20,
+                    height: 28
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var subtaskProgressLine: some View {
+        if let subtaskProgressText {
+            HStack(spacing: 4) {
+                Image(systemName: "checklist")
+                    .font(.system(size: 10, weight: .medium))
+                Text(subtaskProgressText)
+                    .font(.system(size: 11, weight: .regular))
+            }
+            .foregroundStyle(.secondary)
+            .transition(.opacity)
         }
     }
 

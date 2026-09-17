@@ -7,6 +7,26 @@ struct TaskTextEditor: NSViewRepresentable {
     var fontSize: CGFloat = NSFont.systemFontSize
     var fontWeight: NSFont.Weight = .regular
     let onSubmit: () -> Void
+    let onIndent: (() -> Bool)?
+    let onOutdent: (() -> Bool)?
+
+    init(
+        text: Binding<String>,
+        isFocused: Binding<Bool>,
+        fontSize: CGFloat = NSFont.systemFontSize,
+        fontWeight: NSFont.Weight = .regular,
+        onSubmit: @escaping () -> Void,
+        onIndent: (() -> Bool)? = nil,
+        onOutdent: (() -> Bool)? = nil
+    ) {
+        _text = text
+        _isFocused = isFocused
+        self.fontSize = fontSize
+        self.fontWeight = fontWeight
+        self.onSubmit = onSubmit
+        self.onIndent = onIndent
+        self.onOutdent = onOutdent
+    }
 
     func makeNSView(context: Context) -> TaskSubmitTextView {
         let view = TaskSubmitTextView()
@@ -14,6 +34,8 @@ struct TaskTextEditor: NSViewRepresentable {
         view.onTextChange = { text = $0 }
         view.onFocusChange = { isFocused = $0 }
         view.onSubmit = onSubmit
+        view.onIndent = onIndent
+        view.onOutdent = onOutdent
         return view
     }
 
@@ -26,6 +48,8 @@ struct TaskTextEditor: NSViewRepresentable {
         view.onTextChange = { text = $0 }
         view.onFocusChange = { isFocused = $0 }
         view.onSubmit = onSubmit
+        view.onIndent = onIndent
+        view.onOutdent = onOutdent
 
         if isFocused, view.window?.firstResponder !== view {
             DispatchQueue.main.async { [weak view] in
@@ -65,6 +89,8 @@ final class TaskSubmitTextView: NSTextView {
     var onTextChange: ((String) -> Void)?
     var onFocusChange: ((Bool) -> Void)?
     var onSubmit: (() -> Void)?
+    var onIndent: (() -> Bool)?
+    var onOutdent: (() -> Bool)?
 
     override var intrinsicContentSize: NSSize {
         guard let textContainer, let layoutManager else {
@@ -128,6 +154,21 @@ final class TaskSubmitTextView: NSTextView {
     }
 
     override func doCommand(by selector: Selector) {
+        if selector == #selector(NSResponder.insertTab(_:)) {
+            if onIndent?() == true {
+                return
+            }
+        }
+        if selector == #selector(NSResponder.insertBacktab(_:)) {
+            if onOutdent?() == true {
+                return
+            }
+        }
+        if selector == #selector(NSResponder.deleteBackward(_:)), isAtBeginningOfText {
+            if onOutdent?() == true {
+                return
+            }
+        }
         let submits = selector == #selector(NSResponder.insertNewline(_:)) ||
             selector == #selector(NSResponder.insertLineBreak(_:)) ||
             selector == #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:))
@@ -136,5 +177,11 @@ final class TaskSubmitTextView: NSTextView {
             return
         }
         super.doCommand(by: selector)
+    }
+
+    private var isAtBeginningOfText: Bool {
+        let range = selectedRange()
+        guard range.length == 0 else { return false }
+        return range.location == 0
     }
 }

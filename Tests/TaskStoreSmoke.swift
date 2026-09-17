@@ -23,6 +23,7 @@ struct TaskStoreSmoke {
     static func main() throws {
         try testAddCompleteRestoreAndReload()
         try testEditAndMovePersist()
+        try testNestedTasksAndCascadeRules()
         try testCompleteCommitsPendingTextAtomically()
         try testExplicitReorderPersists()
         try testTaskGroupsPersistAndMoveAtReleasePosition()
@@ -82,6 +83,103 @@ struct TaskStoreSmoke {
         let reloaded = TaskStore(fileURL: fixture.fileURL)
         try require(reloaded.pendingTasks.map(\.text) == ["第二条", "修改后"],
                     "编辑或排序没有持久化")
+    }
+
+    @MainActor
+    private static func testNestedTasksAndCascadeRules() throws {
+        let fixture = try Fixture()
+        let store = TaskStore(fileURL: fixture.fileURL)
+        let parent = try store.add(text: "发布主页")
+        let firstChild = try store.add(
+            text: "完成主页布局",
+            after: nil,
+            group: .shortTerm,
+            parentID: parent.id
+        )
+        let secondChild = try store.add(
+            text: "补齐窗口行为",
+            after: firstChild.id,
+            group: .shortTerm,
+            parentID: parent.id
+        )
+
+        try require(store.children(of: parent.id).map(\.id) == [firstChild.id, secondChild.id],
+                    "子任务顺序不正确")
+        try require(store.topLevelPendingTasks.map(\.id) == [parent.id],
+                    "子任务不应出现在一级任务列表")
+
+        try store.complete(id: firstChild.id)
+        try require(store.subtaskProgressText(for: parent.id) == "1/2 已完成",
+                    "父任务没有显示子任务完成进度")
+        try require(store.pendingTasks.map(\.id) == [parent.id, secondChild.id],
+                    "子任务单独完成时影响了父任务")
+        try require(store.historyTasks.map(\.id) == [firstChild.id],
+                    "子任务单独完成没有进入已完成")
+
+        try store.complete(id: parent.id)
+        try require(store.pendingTasks.isEmpty,
+                    "完成父任务后仍有未完成的子任务")
+        try require(Set(store.historyTasks.map(\.id)) ==
+                        Set([parent.id, firstChild.id, secondChild.id]),
+                    "完成父任务没有级联完成全部子任务")
+
+        let reloaded = TaskStore(fileURL: fixture.fileURL)
+        try require(reloaded.children(of: parent.id).map(\.id) ==
+                        [firstChild.id, secondChild.id],
+                    "重启后父子层级没有保持")
+
+        try reloaded.restore(id: parent.id)
+        try require(reloaded.pendingTasks.map(\.id).count == 3,
+                    "恢复父任务没有恢复子任务")
+        try reloaded.delete(id: parent.id)
+        try require(reloaded.tasks.isEmpty,
+                    "删除父任务没有级联删除全部子任务")
+
+        let indentStore = TaskStore(
+            fileURL: fixture.directoryURL.appendingPathComponent("indent.json")
+        )
+        let firstRoot = try indentStore.add(text: "第一项")
+        let secondRoot = try indentStore.add(text: "第二项")
+        try indentStore.indent(id: secondRoot.id)
+        try require(indentStore.children(of: firstRoot.id).map(\.id) == [secondRoot.id],
+                    "Tab 缩进没有建立子任务层级")
+        try indentStore.outdent(id: secondRoot.id)
+        try require(indentStore.topLevelPendingTasks.map(\.id) ==
+                        [firstRoot.id, secondRoot.id],
+                    "退格回退没有恢复一级任务")
+
+        let hierarchyParent = try indentStore.add(text: "层级父任务")
+        let hierarchyChild = try indentStore.add(
+            text: "层级子任务",
+            group: .shortTerm,
+            parentID: hierarchyParent.id
+        )
+        do {
+            _ = try indentStore.add(
+                text: "不允许的三级任务",
+                group: .shortTerm,
+                parentID: hierarchyChild.id
+            )
+            throw TestFailure.failed("不应允许创建三级任务")
+        } catch TaskStoreError.invalidHierarchy {
+            // 预期失败。
+        }
+
+        let groupStore = TaskStore(
+            fileURL: fixture.directoryURL.appendingPathComponent("groups.json")
+        )
+        let groupParent = try groupStore.add(text: "移动整组")
+        let groupChild = try groupStore.add(
+            text: "跟随父任务",
+            group: .shortTerm,
+            parentID: groupParent.id
+        )
+        let longTarget = try groupStore.add(text: "长期目标", group: .longTerm)
+        try groupStore.move(id: groupParent.id, to: .longTerm, before: longTarget.id)
+        try require(groupStore.longTermTasks.map(\.id) == [groupParent.id, groupChild.id, longTarget.id],
+                    "父任务跨分组时没有带上子任务")
+        try require(groupStore.children(of: groupParent.id).map(\.id) == [groupChild.id],
+                    "跨分组后父子层级没有保持")
     }
 
     @MainActor
@@ -147,6 +245,12 @@ struct TaskStoreSmoke {
         try require(store.loadError == nil, "旧任务数据无法读取")
         try require(store.shortTermTasks.map(\.id) == [taskID], "旧任务没有默认归入短期")
         try require(store.longTermTasks.isEmpty, "旧任务错误归入长期")
+        try store.updateText(id: taskID, text: "迁移后的任务")
+        let migratedData = try Data(contentsOf: fixture.fileURL)
+        let migratedObject = try JSONSerialization.jsonObject(with: migratedData)
+        let migratedSchema = (migratedObject as? [String: Any])?["schemaVersion"] as? Int
+        try require(migratedSchema == TaskDatabase.currentSchemaVersion,
+                    "旧任务写入后没有升级数据版本")
     }
 
     @MainActor

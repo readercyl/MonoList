@@ -5,15 +5,18 @@ struct TaskDropTarget: Equatable {
     let group: TaskGroup
     let beforeID: UUID?
     let highlightsGroupHeader: Bool
+    let parentID: UUID?
 
     init(
         group: TaskGroup,
         beforeID: UUID?,
-        highlightsGroupHeader: Bool = false
+        highlightsGroupHeader: Bool = false,
+        parentID: UUID? = nil
     ) {
         self.group = group
         self.beforeID = beforeID
         self.highlightsGroupHeader = highlightsGroupHeader
+        self.parentID = parentID
     }
 }
 
@@ -35,13 +38,15 @@ final class TaskDropCoordinator: ObservableObject {
     func hover(
         group: TaskGroup,
         before destinationID: UUID?,
-        highlightsGroupHeader: Bool = false
+        highlightsGroupHeader: Bool = false,
+        parentID: UUID? = nil
     ) {
         guard sessionID != nil else { return }
         target = TaskDropTarget(
             group: group,
             beforeID: destinationID,
-            highlightsGroupHeader: highlightsGroupHeader
+            highlightsGroupHeader: highlightsGroupHeader,
+            parentID: parentID
         )
     }
 
@@ -49,13 +54,15 @@ final class TaskDropCoordinator: ObservableObject {
         group: TaskGroup,
         before destinationID: UUID?,
         highlightsGroupHeader: Bool = false,
+        parentID: UUID? = nil,
         sessionID expectedSessionID: UUID
     ) {
         guard expectedSessionID == sessionID else { return }
         hover(
             group: group,
             before: destinationID,
-            highlightsGroupHeader: highlightsGroupHeader
+            highlightsGroupHeader: highlightsGroupHeader,
+            parentID: parentID
         )
     }
 
@@ -65,12 +72,14 @@ final class TaskDropCoordinator: ObservableObject {
         lowerBeforeID: UUID?,
         locationY: CGFloat,
         rowHeight: CGFloat,
-        highlightsGroupHeader: Bool = false
+        highlightsGroupHeader: Bool = false,
+        parentID: UUID? = nil
     ) -> TaskDropTarget {
         TaskDropTarget(
             group: group,
             beforeID: locationY < rowHeight / 2 ? upperBeforeID : lowerBeforeID,
-            highlightsGroupHeader: highlightsGroupHeader
+            highlightsGroupHeader: highlightsGroupHeader,
+            parentID: parentID
         )
     }
 
@@ -105,7 +114,12 @@ final class TaskDropCoordinator: ObservableObject {
 
     func performDrop(sourceID: UUID, store: TaskStore) throws {
         guard let target else { return }
-        try store.move(id: sourceID, to: target.group, before: target.beforeID)
+        try store.move(
+            id: sourceID,
+            to: target.group,
+            before: target.beforeID,
+            parentID: target.parentID
+        )
         cancel()
     }
 }

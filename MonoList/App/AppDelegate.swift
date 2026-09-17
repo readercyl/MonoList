@@ -189,7 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ sender: NSApplication,
         hasVisibleWindows flag: Bool
     ) -> Bool {
-        windowCoordinator?.toggleMainPanelFromDock()
+        windowCoordinator?.showHome()
         return true
     }
 

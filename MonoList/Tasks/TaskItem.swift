@@ -76,9 +76,11 @@ struct TaskItem: Identifiable, Codable, Equatable {
     var completedAt: Date?
     var reminder: TaskReminder? = nil
     var group: TaskGroup = .shortTerm
+    var parentID: UUID? = nil
 
     private enum CodingKeys: String, CodingKey {
-        case id, text, status, order, createdAt, updatedAt, completedAt, reminder, group
+        case id, text, status, order, createdAt, updatedAt, completedAt, reminder, group,
+             parentID
     }
 
     init(
@@ -90,7 +92,8 @@ struct TaskItem: Identifiable, Codable, Equatable {
         updatedAt: Date,
         completedAt: Date?,
         reminder: TaskReminder? = nil,
-        group: TaskGroup = .shortTerm
+        group: TaskGroup = .shortTerm,
+        parentID: UUID? = nil
     ) {
         self.id = id
         self.text = text
@@ -101,6 +104,7 @@ struct TaskItem: Identifiable, Codable, Equatable {
         self.completedAt = completedAt
         self.reminder = reminder
         self.group = group
+        self.parentID = parentID
     }
 
     init(from decoder: Decoder) throws {
@@ -114,11 +118,13 @@ struct TaskItem: Identifiable, Codable, Equatable {
         completedAt = try container.decodeIfPresent(Date.self, forKey: .completedAt)
         reminder = try container.decodeIfPresent(TaskReminder.self, forKey: .reminder)
         group = try container.decodeIfPresent(TaskGroup.self, forKey: .group) ?? .shortTerm
+        parentID = try container.decodeIfPresent(UUID.self, forKey: .parentID)
     }
 }
 
 struct TaskDatabase: Codable, Equatable {
-    static let currentSchemaVersion = 1
+    static let legacySchemaVersion = 1
+    static let currentSchemaVersion = 2
 
     let schemaVersion: Int
     var tasks: [TaskItem]
@@ -127,4 +133,22 @@ struct TaskDatabase: Codable, Equatable {
         schemaVersion = Self.currentSchemaVersion
         self.tasks = tasks
     }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        guard schemaVersion == Self.legacySchemaVersion ||
+            schemaVersion == Self.currentSchemaVersion else {
+            throw TaskDatabaseError.invalidSchemaVersion
+        }
+        tasks = try container.decode([TaskItem].self, forKey: .tasks)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, tasks
+    }
+}
+
+enum TaskDatabaseError: Error {
+    case invalidSchemaVersion
 }
