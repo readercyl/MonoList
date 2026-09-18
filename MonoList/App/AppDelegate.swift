@@ -24,6 +24,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Bundle.main.bundleIdentifier == "com.qingcheng.monolist.dev"
     }
 
+    private var applicationSupportDirectoryName: String {
+        isDevelopmentBuild ? "MonoList 开发版" : "MonoList"
+    }
+
     static func main() {
         let application = NSApplication.shared
         let delegate = AppDelegate()
@@ -36,7 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let applicationSupportURL = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
-        )[0].appendingPathComponent("MonoList")
+        )[0].appendingPathComponent(applicationSupportDirectoryName)
         let store = TaskStore(
             fileURL: applicationSupportURL.appendingPathComponent("tasks.json")
         )

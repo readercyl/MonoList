@@ -4,6 +4,7 @@
 
 - `/Applications/MonoList.app` 是本机唯一正式版入口，只保留当前最新正式版本。
 - 默认执行 `scripts/build-local.sh` 只生成代码仓库内的 `build/local/MonoList 开发版.app`。
+- 开发版版本号由 `MONOLIST_DEV_VERSION` 和 `MONOLIST_DEV_BUILD` 独立维护，不能沿用或覆盖正式版版本号。
 - 开发版必须使用独立显示名称 `MonoList 开发版`、独立 Bundle ID
   `com.qingcheng.monolist.dev` 和独立菜单栏服务 Bundle ID，不得复用正式版身份。
 - 开发版可以在开发完成后由青城点击测试，但不得复制到 `/Applications`，不得被当作正式版启动。

@@ -31,6 +31,7 @@ required_files=(
   "$ROOT_DIR/scripts/package-dmg.sh"
   "$ROOT_DIR/scripts/release.sh"
   "$ROOT_DIR/scripts/cleanup-build.sh"
+  "$ROOT_DIR/scripts/migrate-tasks-schema1.sh"
 )
 
 for file in "${required_files[@]}"; do

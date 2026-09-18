@@ -22,9 +22,18 @@ case "$BUILD_FLAVOR" in
     ;;
 esac
 EXECUTABLE_NAME="MonoList"
-APP_VERSION="${MONOLIST_APP_VERSION:-v0.1.0}"
+if [[ "$BUILD_FLAVOR" == "development" ]]; then
+  APP_VERSION="${MONOLIST_DEV_VERSION:-v0.1.0}"
+  APP_BUILD="${MONOLIST_DEV_BUILD:-1}"
+else
+  APP_VERSION="${MONOLIST_APP_VERSION:-}"
+  APP_BUILD="${MONOLIST_APP_BUILD:-1}"
+fi
+[[ "$APP_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+  echo "版本号必须是三段式 SemVer：$APP_VERSION" >&2
+  exit 1
+}
 BUNDLE_SHORT_VERSION="${APP_VERSION#v}"
-APP_BUILD="${MONOLIST_APP_BUILD:-1}"
 MIN_MACOS_VERSION="14.0"
 SWIFT_TARGET="arm64-apple-macosx$MIN_MACOS_VERSION"
 BUILD_DIR="$ROOT_DIR/build/local"
