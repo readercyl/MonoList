@@ -47,8 +47,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let settings = AppSettings(
             fileURL: applicationSupportURL.appendingPathComponent("settings.json")
         )
-        let loginController = LoginItemController()
-        if settings.launchAtLogin && loginController.status != .enabled {
+        let loginController = LoginItemController(
+            isDevelopmentBuild: isDevelopmentBuild
+        )
+        if isDevelopmentBuild {
+            loginController.removeDevelopmentRegistration()
+        } else if
+            settings.launchAtLogin && loginController.status != .enabled {
             try? loginController.setEnabled(true)
         }
         try? store.refreshDailyReminderTasks()

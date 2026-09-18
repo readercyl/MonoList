@@ -236,22 +236,30 @@ struct SettingsView: View {
                 .toggleStyle(SettingsSwitchStyle())
             }
             settingsRow("开机后自动启动") {
-                Toggle(
-                    "",
-                    isOn: Binding(
-                        get: { loginItemController.status == .enabled },
-                        set: { enabled in
-                            do {
-                                try loginItemController.setEnabled(enabled)
-                                try settings.update { $0.launchAtLogin = enabled }
-                            } catch {
-                                errorMessage = error.localizedDescription
+                if loginItemController.isDevelopmentBuild {
+                    Text("由正式版管理")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: Self.controlWidth, height: Self.controlHeight)
+                        .modifier(SettingValueBackground())
+                } else {
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { loginItemController.status == .enabled },
+                            set: { enabled in
+                                do {
+                                    try loginItemController.setEnabled(enabled)
+                                    try settings.update { $0.launchAtLogin = enabled }
+                                } catch {
+                                    errorMessage = error.localizedDescription
+                                }
                             }
-                        }
+                        )
                     )
-                )
-                .labelsHidden()
-                .toggleStyle(SettingsSwitchStyle())
+                    .labelsHidden()
+                    .toggleStyle(SettingsSwitchStyle())
+                }
             }
         }
     }
