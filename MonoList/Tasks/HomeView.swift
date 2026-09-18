@@ -102,7 +102,7 @@ struct HomeView: View {
             mainColumn
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .frame(minWidth: 760, minHeight: 520)
+        .frame(minWidth: 720, minHeight: 480)
     }
 
     private var sidebar: some View {
@@ -170,7 +170,6 @@ struct HomeView: View {
             .padding(.vertical, 10)
         }
         .frame(width: 204)
-        .background(Color(nsColor: .underPageBackgroundColor))
     }
 
     private var mainColumn: some View {

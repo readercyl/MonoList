@@ -93,6 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.updateInstaller = updateInstaller
         windowCoordinator = coordinator
         installMenuBarObservers()
+        showHomeForInteractiveLaunch()
         let initialMenuBarStatus = Self.menuBarStatus(
             tasks: store.tasks,
             focusSelection: focusStore.selection
@@ -204,6 +205,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ) -> Bool {
         windowCoordinator?.showHome()
         return true
+    }
+
+    private func showHomeForInteractiveLaunch() {
+        DispatchQueue.main.async { [weak self] in
+            let currentProcessID = ProcessInfo.processInfo.processIdentifier
+            let isFrontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier ==
+                currentProcessID
+            guard NSApp.isActive || isFrontmost else { return }
+            self?.windowCoordinator?.showHome()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
