@@ -15,9 +15,9 @@ struct WindowCoordinatorSmoke {
         precondition(WindowCoordinator.mainPanelWidth == 336)
         precondition(WindowCoordinator.mainPanelMaximumHeight == 560)
         precondition(WindowCoordinator.homeWindowDefaultSize.width == 400)
-        precondition(WindowCoordinator.homeWindowDefaultSize.height == 720)
+        precondition(WindowCoordinator.homeWindowDefaultSize.height == 640)
         precondition(WindowCoordinator.homeWindowMinimumSize.width == 380)
-        precondition(WindowCoordinator.homeWindowAutosaveName == "MonoList.HomeWindow.Compact")
+        precondition(WindowCoordinator.homeWindowAutosaveName == "MonoList.HomeWindow.CompactV2")
 
         let panelWindow = NSPanel()
         let homeWindow = NSWindow()
@@ -96,6 +96,8 @@ struct WindowCoordinatorSmoke {
             contentsOfFile: "MonoList/Tasks/HomeView.swift",
             encoding: .utf8
         )
+        precondition(!homeSource.contains("Text(\"设置\")"))
+        precondition(homeSource.contains(".frame(height: 56)"))
         let windowSource = try String(
             contentsOfFile: "MonoList/App/WindowCoordinator.swift",
             encoding: .utf8

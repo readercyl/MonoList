@@ -177,24 +177,24 @@ struct HomeView: View {
     private var settingsContent: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Button {
-                    presentation.section = .tasks
-                } label: {
-                    Label("返回", systemImage: "chevron.left")
-                }
-                .buttonStyle(.plain)
-                .help("返回待办")
-
                 WindowDragArea()
                     .frame(maxWidth: .infinity)
                     .frame(height: 30)
 
-                Text("设置")
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 42)
+                Button {
+                    presentation.section = .tasks
+                } label: {
+                    Label("返回", systemImage: "chevron.left")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .frame(width: 76, height: 56)
+                .contentShape(Rectangle())
+                .help("返回待办")
             }
             .padding(.horizontal, 14)
-            .frame(height: 48)
+            .frame(height: 56)
 
             Divider().opacity(0.45)
 
@@ -219,7 +219,7 @@ struct HomeView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("今天")
                     .font(.system(size: 17, weight: .semibold))
                 Text(currentDate, format: .dateTime.month().day().weekday())

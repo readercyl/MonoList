@@ -191,7 +191,7 @@ struct TaskListView: View {
 
     private var header: some View {
         HStack(spacing: 7) {
-            VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
                 Text("今天")
                     .font(.system(size: 15, weight: .semibold))
                 Text(currentDate, format: .dateTime.month().day().weekday())
