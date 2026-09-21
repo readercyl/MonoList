@@ -18,6 +18,7 @@ struct TaskListView: View {
     @State private var draftFocused = false
     @State private var draftRequestID = UUID()
     @State private var collapsedTaskIDs: Set<UUID> = []
+    @State private var measuredTaskContentHeight: CGFloat = 0
     @StateObject private var dropCoordinator = TaskDropCoordinator()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -49,11 +50,15 @@ struct TaskListView: View {
             $0 + Self.additionalLines(for: $1.text)
         }
         let dateHeaders = showsOlderCompleted ? olderCompletedGroups.count : 0
-        return Self.contentHeight(
+        let estimatedHeight = Self.contentHeight(
             rowCount: rows,
             additionalLineCount: extraLines,
             dateHeaderCount: dateHeaders
         )
+        let measuredHeight = measuredTaskContentHeight > 0
+            ? measuredTaskContentHeight + 53
+            : 0
+        return max(estimatedHeight, measuredHeight)
     }
 
     private var preferredHeight: CGFloat {
@@ -151,6 +156,10 @@ struct TaskListView: View {
                 ScrollView {
                     taskContent
                 }
+                .onPreferenceChange(PanelTaskContentHeightPreferenceKey.self) { height in
+                    guard height > 0 else { return }
+                    measuredTaskContentHeight = height
+                }
                 .onChange(of: draftRequestID) { _, _ in
                     DispatchQueue.main.async {
                         withAnimation(.easeOut(duration: 0.16)) {
@@ -236,6 +245,14 @@ struct TaskListView: View {
             .padding(.horizontal, 7)
             .padding(.vertical, 7)
             .frame(maxWidth: .infinity, alignment: .topLeading)
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: PanelTaskContentHeightPreferenceKey.self,
+                        value: geometry.size.height
+                    )
+                }
+            }
         }
     }
 
@@ -775,6 +792,14 @@ private enum PanelClearAction {
 private struct PanelCompletedGroup {
     let date: Date
     let tasks: [TaskItem]
+}
+
+private struct PanelTaskContentHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
 }
 
 private struct PanelHeaderIconLabel: View {

@@ -61,7 +61,8 @@ if grep -q 'systemName: "xmark"' "$TASK_LIST"; then
 fi
 
 if ! grep -q 'visibleCompletedTasks' "$TASK_LIST" ||
-   ! grep -q 'onChange(of: showsOlderCompleted)' "$TASK_LIST"; then
+   ! grep -q 'onChange(of: showsOlderCompleted)' "$TASK_LIST" ||
+   ! grep -q 'PanelTaskContentHeightPreferenceKey' "$TASK_LIST"; then
   echo "浮窗隐藏历史记录后必须按可见内容重新计算窗口高度。" >&2
   exit 1
 fi
