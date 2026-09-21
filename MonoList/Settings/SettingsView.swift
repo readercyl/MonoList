@@ -101,6 +101,7 @@ struct SettingsView: View {
             .buttonStyle(.plain)
             .frame(width: 64, height: 40)
             .contentShape(Rectangle())
+            .offset(y: -14)
             .help("返回待办")
         }
         .frame(height: 58)
