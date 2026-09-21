@@ -33,6 +33,7 @@ struct HomeView: View {
     @State private var draftRequestID = UUID()
     @State private var errorMessage: String?
     @State private var showsOlderCompleted = true
+    @State private var showsScrollToTop = false
     @State private var clearAction: HomeClearAction?
     @StateObject private var dropCoordinator = TaskDropCoordinator()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -120,10 +121,27 @@ struct HomeView: View {
             Divider().opacity(0.45)
             ScrollViewReader { proxy in
                 ScrollView {
-                    taskList
-                        .onTapGesture {
-                            clearInteraction()
+                    VStack(spacing: 0) {
+                        Color.clear
+                            .frame(height: 1)
+                            .id("home-scroll-top")
+                        taskList
+                            .onTapGesture {
+                                clearInteraction()
+                            }
+                    }
+                    .background {
+                        GeometryReader { geometry in
+                            Color.clear.preference(
+                                key: HomeScrollOffsetPreferenceKey.self,
+                                value: geometry.frame(in: .named("home-scroll")).minY
+                            )
                         }
+                    }
+                }
+                .coordinateSpace(name: "home-scroll")
+                .onPreferenceChange(HomeScrollOffsetPreferenceKey.self) { minY in
+                    showsScrollToTop = minY < -160
                 }
                 .onChange(of: draftRequestID) { _, _ in
                     DispatchQueue.main.async {
@@ -131,6 +149,27 @@ struct HomeView: View {
                             proxy.scrollTo("home-task-draft-row", anchor: .bottom)
                         }
                         draftFocused = true
+                    }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if showsScrollToTop {
+                        Button {
+                            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
+                                proxy.scrollTo("home-scroll-top", anchor: .top)
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 36, height: 36)
+                                .background(Color.primary.opacity(0.78), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("回到顶部")
+                        .help("回到顶部")
+                        .padding(.trailing, 14)
+                        .padding(.bottom, 14)
+                        .transition(.opacity)
                     }
                 }
             }
@@ -965,6 +1004,14 @@ private struct HomeTaskDropDelegate: DropDelegate {
 private struct WindowDragArea: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView { HomeDraggingNSView() }
     func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+private struct HomeScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
 }
 
 private final class HomeDraggingNSView: NSView {
