@@ -90,12 +90,14 @@ struct SettingsView: View {
             Spacer(minLength: 0)
             Button(action: onBack) {
                 Label("返回", systemImage: "chevron.left")
+                    .font(.system(size: 13))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .frame(width: 76, height: 58)
+            .frame(width: 64, height: 40)
             .contentShape(Rectangle())
+            .padding(.top, 9)
             .help("返回待办")
         }
         .frame(height: 58)
