@@ -97,7 +97,7 @@ struct WindowCoordinatorSmoke {
             encoding: .utf8
         )
         precondition(!homeSource.contains("Text(\"设置\")"))
-        precondition(homeSource.contains(".frame(height: 56)"))
+        precondition(homeSource.contains("onBack: { presentation.section = .tasks }"))
         let windowSource = try String(
             contentsOfFile: "MonoList/App/WindowCoordinator.swift",
             encoding: .utf8

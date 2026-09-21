@@ -40,14 +40,6 @@ struct TaskListView: View {
         showsOlderCompleted ? olderCompletedGroups.reduce(0) { $0 + $1.tasks.count } : 0
     }
 
-    private var visiblePendingRowCount: Int {
-        store.topLevelPendingTasks.reduce(0) { count, root in
-            count + 1 + (
-                collapsedTaskIDs.contains(root.id) ? 0 : store.children(of: root.id).count
-            )
-        }
-    }
-
     private var naturalHeight: CGFloat {
         let visibleCompleted = todayCompletedRoots.count + visibleOlderCount
         let rows = store.pendingTasks.count + visibleCompleted + (draftState.isPresented ? 1 : 0)
@@ -66,10 +58,7 @@ struct TaskListView: View {
         let measuredHeight = measuredTaskContentHeight > 0
             ? measuredTaskContentHeight + 53
             : 0
-        let minimumPendingHeight = visiblePendingRowCount > 0
-            ? 150 + CGFloat(visiblePendingRowCount * 68)
-            : 0
-        return max(estimatedHeight, measuredHeight, minimumPendingHeight)
+        return max(estimatedHeight, measuredHeight)
     }
 
     private var preferredHeight: CGFloat {

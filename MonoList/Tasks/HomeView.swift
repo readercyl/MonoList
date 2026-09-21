@@ -175,44 +175,21 @@ struct HomeView: View {
     }
 
     private var settingsContent: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                WindowDragArea()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 30)
-
-                Button {
-                    presentation.section = .tasks
-                } label: {
-                    Label("返回", systemImage: "chevron.left")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .frame(width: 76, height: 56)
-                .contentShape(Rectangle())
-                .help("返回待办")
-            }
-            .padding(.horizontal, 14)
-            .frame(height: 56)
-
-            Divider().opacity(0.45)
-
-            ScrollView(.vertical) {
-                SettingsView(
-                    settings: settings,
-                    taskStore: store,
-                    reminderScheduler: reminderScheduler,
-                    loginItemController: loginItemController,
-                    updater: updater,
-                    onInstallUpdate: onInstallUpdate,
-                    onTestReminder: onTestReminder
-                )
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-            }
-            .scrollBounceBehavior(.always, axes: .vertical)
+        ScrollView(.vertical) {
+            SettingsView(
+                settings: settings,
+                taskStore: store,
+                reminderScheduler: reminderScheduler,
+                loginItemController: loginItemController,
+                updater: updater,
+                onInstallUpdate: onInstallUpdate,
+                onTestReminder: onTestReminder,
+                onBack: { presentation.section = .tasks }
+            )
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
         }
+        .scrollBounceBehavior(.always, axes: .vertical)
         .background(Color(nsColor: .windowBackgroundColor))
         .frame(maxWidth: .infinity, alignment: .top)
     }

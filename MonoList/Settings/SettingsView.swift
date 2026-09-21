@@ -12,6 +12,7 @@ struct SettingsView: View {
     @ObservedObject var updater: AppUpdater
     let onInstallUpdate: (AppUpdate) -> Void
     let onTestReminder: () -> Void
+    let onBack: () -> Void
 
     @State private var errorMessage: String?
     @State private var currentDate = Date()
@@ -87,6 +88,15 @@ struct SettingsView: View {
             }
             .frame(height: 58)
             Spacer(minLength: 0)
+            Button(action: onBack) {
+                Label("返回", systemImage: "chevron.left")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .frame(width: 76, height: 58)
+            .contentShape(Rectangle())
+            .help("返回待办")
         }
         .frame(height: 58)
     }
