@@ -5,11 +5,10 @@ import UniformTypeIdentifiers
 struct TaskListView: View {
     @ObservedObject var store: TaskStore
     @ObservedObject var draftState: TaskDraftState
-    let onClose: () -> Void
     let onOpenHome: () -> Void
     let onHeightChanged: (CGFloat) -> Void
 
-    @State private var showsOlderCompleted = false
+    @State private var showsOlderCompleted = true
     @State private var errorMessage: String?
     @State private var selectedTaskID: UUID?
     @State private var editingTaskID: UUID?
@@ -43,7 +42,10 @@ struct TaskListView: View {
     private var naturalHeight: CGFloat {
         let visibleCompleted = todayCompletedRoots.count + visibleOlderCount
         let rows = store.pendingTasks.count + visibleCompleted + (draftState.isPresented ? 1 : 0)
-        let extraLines = (store.pendingTasks + store.historyTasks).reduce(0) {
+        let visibleCompletedTasks = todayCompletedRoots + (
+            showsOlderCompleted ? olderCompletedGroups.flatMap(\.tasks) : []
+        )
+        let extraLines = (store.pendingTasks + visibleCompletedTasks).reduce(0) {
             $0 + Self.additionalLines(for: $1.text)
         }
         let dateHeaders = showsOlderCompleted ? olderCompletedGroups.count : 0
@@ -97,6 +99,11 @@ struct TaskListView: View {
         }
         .onChange(of: preferredHeight) { _, height in
             onHeightChanged(height)
+        }
+        .onChange(of: showsOlderCompleted) { _, _ in
+            DispatchQueue.main.async {
+                onHeightChanged(preferredHeight)
+            }
         }
         .onChange(of: store.pendingTasks.count) { _, count in
             if count == 0 && !draftState.isPresented {
@@ -160,7 +167,7 @@ struct TaskListView: View {
     private var header: some View {
         HStack(spacing: 7) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("待办")
+                Text("今天")
                     .font(.system(size: 15, weight: .semibold))
                 Text(currentDate, format: .dateTime.month().day().weekday())
                     .font(.system(size: 10))
@@ -205,11 +212,6 @@ struct TaskListView: View {
             .buttonStyle(PanelHeaderIconButtonStyle())
             .help("打开主页")
 
-            Button(action: onClose) {
-                PanelHeaderIconLabel(systemName: "xmark")
-            }
-            .buttonStyle(PanelHeaderIconButtonStyle())
-            .help("关闭浮窗")
         }
         .padding(.leading, 13)
         .padding(.trailing, 8)

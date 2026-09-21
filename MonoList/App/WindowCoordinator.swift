@@ -6,8 +6,8 @@ final class WindowCoordinator {
     static let mainPanelWidth: CGFloat = 336
     static let mainPanelMinimumHeight: CGFloat = 106
     static let mainPanelMaximumHeight: CGFloat = 447
-    static let homeWindowDefaultSize = NSSize(width: 400, height: 720)
-    static let homeWindowMinimumSize = NSSize(width: 360, height: 520)
+    static let homeWindowDefaultSize = NSSize(width: 430, height: 760)
+    static let homeWindowMinimumSize = NSSize(width: 380, height: 520)
     static let homeWindowAutosaveName = "MonoList.HomeWindow"
 
     static var appDisplayName: String {
@@ -299,6 +299,9 @@ final class WindowCoordinator {
         }
 
         if let homeWindow {
+            if showSettings {
+                fitHomeWindowToSettings()
+            }
             NSApp.activate(ignoringOtherApps: true)
             homeWindow.makeKeyAndOrderFront(nil)
             return
@@ -336,6 +339,9 @@ final class WindowCoordinator {
                             height: Self.homeWindowMinimumSize.height + 32
                         )
                     }
+                },
+                onSettingsSizeChanged: { [weak self] in
+                    self?.fitHomeWindowToSettings()
                 }
             )
         )
@@ -354,6 +360,17 @@ final class WindowCoordinator {
         window.setFrameAutosaveName(Self.homeWindowAutosaveName)
         if !restoredFrame {
             window.center()
+        } else {
+            let currentContentSize = window.contentRect(forFrameRect: window.frame).size
+            if currentContentSize.width < Self.homeWindowDefaultSize.width ||
+                currentContentSize.height < Self.homeWindowDefaultSize.height {
+                window.setContentSize(
+                    NSSize(
+                        width: max(currentContentSize.width, Self.homeWindowDefaultSize.width),
+                        height: max(currentContentSize.height, Self.homeWindowDefaultSize.height)
+                    )
+                )
+            }
         }
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
@@ -366,15 +383,29 @@ final class WindowCoordinator {
         }
     }
 
+    private func fitHomeWindowToSettings() {
+        guard let homeWindow,
+              let contentView = homeWindow.contentView else {
+            return
+        }
+        DispatchQueue.main.async {
+            contentView.layoutSubtreeIfNeeded()
+            let fittingSize = contentView.fittingSize
+            homeWindow.setContentSize(
+                NSSize(
+                    width: max(Self.homeWindowDefaultSize.width, ceil(fittingSize.width)),
+                    height: max(Self.homeWindowDefaultSize.height, ceil(fittingSize.height))
+                )
+            )
+        }
+    }
+
     private func makeMainPanel() -> MainPanel {
         weak var panelReference: MainPanel?
         let hostingView = MainPanelHostingView(
             rootView: TaskListView(
                 store: taskStore,
                 draftState: draftState,
-                onClose: { [weak self] in
-                    self?.closeMainPanel(restoringFocus: true)
-                },
                 onOpenHome: { [weak self] in
                     self?.closeMainPanel()
                     self?.showHome()

@@ -14,9 +14,9 @@ struct WindowCoordinatorSmoke {
 
         precondition(WindowCoordinator.mainPanelWidth == 336)
         precondition(WindowCoordinator.mainPanelMaximumHeight == 447)
-        precondition(WindowCoordinator.homeWindowDefaultSize.width == 400)
-        precondition(WindowCoordinator.homeWindowDefaultSize.height == 720)
-        precondition(WindowCoordinator.homeWindowMinimumSize.width == 360)
+        precondition(WindowCoordinator.homeWindowDefaultSize.width == 430)
+        precondition(WindowCoordinator.homeWindowDefaultSize.height == 760)
+        precondition(WindowCoordinator.homeWindowMinimumSize.width == 380)
 
         let panelWindow = NSPanel()
         let homeWindow = NSWindow()

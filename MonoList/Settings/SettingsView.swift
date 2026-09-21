@@ -109,22 +109,28 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             settingsRow("提醒声音") {
+                Toggle(
+                    "",
+                    isOn: binding(
+                        get: { settings.reminderSoundEnabled },
+                        update: { $0.reminderSoundEnabled = $1 }
+                    )
+                )
+                .labelsHidden()
+                .toggleStyle(SettingsSwitchStyle())
+                .disabled(!settings.reminderEnabled)
+            }
+            settingsRow("声音类型") {
                 SettingsPopupButton(
-                    items: ["关闭"] + Self.systemSoundNames,
-                    selectedTitle: settings.reminderSoundEnabled
-                        ? settings.reminderSoundName
-                        : "关闭"
+                    items: Self.systemSoundNames,
+                    selectedTitle: settings.reminderSoundName
                 ) { title in
-                    updateSettings {
-                        $0.reminderSoundEnabled = title != "关闭"
-                        if title != "关闭" { $0.reminderSoundName = title }
-                    }
-                    if title != "关闭" {
-                        (NSSound(named: NSSound.Name(title)) ??
-                            NSSound(named: NSSound.Name("Glass")))?.play()
-                    }
+                    updateSettings { $0.reminderSoundName = title }
+                    (NSSound(named: NSSound.Name(title)) ??
+                        NSSound(named: NSSound.Name("Glass")))?.play()
                 }
                 .frame(width: Self.controlWidth, height: Self.controlHeight)
+                .disabled(!settings.reminderEnabled || !settings.reminderSoundEnabled)
             }
             Divider().opacity(0.4)
             settingsRow("提醒时段") {

@@ -36,6 +36,29 @@ if ! grep -q 'olderCompletedGroups' "$TASK_LIST" ||
   exit 1
 fi
 
+if ! grep -q 'Text("今天")' "$TASK_LIST" ||
+   ! grep -q 'Text("今天")' "$HOME_VIEW"; then
+  echo "主页和浮窗标题必须显示今天和日期。" >&2
+  exit 1
+fi
+
+if ! grep -q '@State private var showsOlderCompleted = true' "$TASK_LIST" ||
+   ! grep -q '@State private var showsOlderCompleted = true' "$HOME_VIEW"; then
+  echo "主页和浮窗已完成任务必须默认展开。" >&2
+  exit 1
+fi
+
+if grep -q 'systemName: "xmark"' "$TASK_LIST"; then
+  echo "菜单栏浮窗右上角不能再显示独立关闭按钮。" >&2
+  exit 1
+fi
+
+if ! grep -q '声音类型' "$SETTINGS" ||
+   [[ "$(grep -c 'reminderSoundEnabled' "$SETTINGS")" -lt 2 ]]; then
+  echo "提醒开关和声音开关必须拆分，声音类型单独选择。" >&2
+  exit 1
+fi
+
 if ! grep -q 'SettingsView(' "$HOME_VIEW" ||
    grep -q 'private var settingsWindow' "$WINDOW_COORDINATOR"; then
   echo "设置必须内置主页，不能再创建独立设置窗口。" >&2

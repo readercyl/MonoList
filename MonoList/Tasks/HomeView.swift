@@ -23,6 +23,7 @@ struct HomeView: View {
     let onInstallUpdate: (AppUpdate) -> Void
     let onTestReminder: () -> Void
     let onWindowReady: () -> Void
+    let onSettingsSizeChanged: () -> Void
 
     @StateObject private var draftState = TaskDraftState()
     @State private var currentDate = Date()
@@ -32,7 +33,7 @@ struct HomeView: View {
     @State private var draftFocused = false
     @State private var draftRequestID = UUID()
     @State private var errorMessage: String?
-    @State private var showsOlderCompleted = false
+    @State private var showsOlderCompleted = true
     @State private var clearAction: HomeClearAction?
     @StateObject private var dropCoordinator = TaskDropCoordinator()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -163,27 +164,30 @@ struct HomeView: View {
 
             Divider().opacity(0.45)
 
-            ScrollView {
-                SettingsView(
-                    settings: settings,
-                    taskStore: store,
-                    reminderScheduler: reminderScheduler,
-                    loginItemController: loginItemController,
-                    updater: updater,
-                    onInstallUpdate: onInstallUpdate,
-                    onTestReminder: onTestReminder
-                )
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-            }
+            SettingsView(
+                settings: settings,
+                taskStore: store,
+                reminderScheduler: reminderScheduler,
+                loginItemController: loginItemController,
+                updater: updater,
+                onInstallUpdate: onInstallUpdate,
+                onTestReminder: onTestReminder
+            )
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .onAppear {
+            DispatchQueue.main.async {
+                onSettingsSizeChanged()
+            }
+        }
     }
 
     private var toolbar: some View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("待办")
+                Text("今天")
                     .font(.system(size: 17, weight: .semibold))
                 Text(currentDate, format: .dateTime.month().day().weekday())
                     .font(.system(size: 11))
