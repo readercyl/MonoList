@@ -66,34 +66,14 @@ final class ReminderPanelController: ObservableObject {
         ]
     }
 
-    static func tasksForFocusTest(
-        _ tasks: [TaskItem],
-        at date: Date = Date()
-    ) -> [TaskItem] {
-        guard tasks.isEmpty else { return tasks }
-        return [
-            TaskItem(
-                id: UUID(),
-                text: "这是一次专注提醒测试",
-                status: .pending,
-                order: 0,
-                createdAt: date,
-                updatedAt: date,
-                completedAt: nil
-            )
-        ]
-    }
-
     func show(
         tasks: [TaskItem],
         position: ReminderPosition,
         menuBarButton: NSStatusBarButton?,
         title: String = "待办提醒",
-        statusText: String? = nil,
-        isFocusReminder: Bool = false,
         isDedicatedReminder: Bool = false,
         testing: Bool = false,
-        playsSound: Bool = true,
+        playsSound: Bool = false,
         soundName: String = "Glass",
         onOpen: @escaping () -> Void,
         onClose: @escaping () -> Void
@@ -105,13 +85,10 @@ final class ReminderPanelController: ObservableObject {
         }
 
         let snapshot = Array(tasks.prefix(3))
-        let panelWidth: CGFloat = isFocusReminder ? 420 : 340
         let model = ReminderPresentationModel()
         let hostingView = NSHostingView(
             rootView: ReminderView(
                 title: title,
-                statusText: statusText,
-                isFocusReminder: isFocusReminder,
                 totalCount: tasks.count,
                 taskTexts: snapshot.map(\.text),
                 model: model,
@@ -124,6 +101,7 @@ final class ReminderPanelController: ObservableObject {
                 }
             )
         )
+        let panelWidth: CGFloat = 340
         hostingView.frame = NSRect(x: 0, y: 0, width: panelWidth, height: 0)
         hostingView.layoutSubtreeIfNeeded()
         let contentHeight = ceil(hostingView.fittingSize.height)

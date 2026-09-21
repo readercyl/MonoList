@@ -26,9 +26,8 @@ struct TaskStoreSmoke {
         try testNestedTasksAndCascadeRules()
         try testCompleteCommitsPendingTextAtomically()
         try testExplicitReorderPersists()
-        try testTaskGroupsPersistAndMoveAtReleasePosition()
         try testLegacyTasksDefaultToShortTerm()
-        try testDraftKeepsLongTermGroupWhenContinuing()
+        try testLegacyGroupsMergeIntoUnifiedOrder()
         try testStableHistoryOrder()
         try testTodayAndOlderCompletedTasks()
         try testOneTimeReminderPersistsAndClears()
@@ -165,21 +164,6 @@ struct TaskStoreSmoke {
             // 预期失败。
         }
 
-        let groupStore = TaskStore(
-            fileURL: fixture.directoryURL.appendingPathComponent("groups.json")
-        )
-        let groupParent = try groupStore.add(text: "移动整组")
-        let groupChild = try groupStore.add(
-            text: "跟随父任务",
-            group: .shortTerm,
-            parentID: groupParent.id
-        )
-        let longTarget = try groupStore.add(text: "长期目标", group: .longTerm)
-        try groupStore.move(id: groupParent.id, to: .longTerm, before: longTarget.id)
-        try require(groupStore.longTermTasks.map(\.id) == [groupParent.id, groupChild.id, longTarget.id],
-                    "父任务跨分组时没有带上子任务")
-        try require(groupStore.children(of: groupParent.id).map(\.id) == [groupChild.id],
-                    "跨分组后父子层级没有保持")
     }
 
     @MainActor
@@ -212,26 +196,6 @@ struct TaskStoreSmoke {
     }
 
     @MainActor
-    private static func testTaskGroupsPersistAndMoveAtReleasePosition() throws {
-        let fixture = try Fixture()
-        let store = TaskStore(fileURL: fixture.fileURL)
-        let shortOne = try store.add(text: "短期一")
-        let shortTwo = try store.add(text: "短期二")
-        let longOne = try store.add(text: "长期一", group: .longTerm)
-        let longTwo = try store.add(text: "长期二", group: .longTerm)
-
-        try store.move(id: shortTwo.id, to: .longTerm, before: longTwo.id)
-        try require(store.shortTermTasks.map(\.id) == [shortOne.id],
-                    "跨组后短期任务不正确")
-        try require(store.longTermTasks.map(\.id) == [longOne.id, shortTwo.id, longTwo.id],
-                    "跨组任务没有插入释放位置")
-
-        let reloaded = TaskStore(fileURL: fixture.fileURL)
-        try require(reloaded.longTermTasks.map(\.id) == [longOne.id, shortTwo.id, longTwo.id],
-                    "跨组排序或分组没有持久化")
-    }
-
-    @MainActor
     private static func testLegacyTasksDefaultToShortTerm() throws {
         let fixture = try Fixture()
         let taskID = UUID()
@@ -254,21 +218,32 @@ struct TaskStoreSmoke {
     }
 
     @MainActor
-    private static func testDraftKeepsLongTermGroupWhenContinuing() throws {
+    private static func testLegacyGroupsMergeIntoUnifiedOrder() throws {
         let fixture = try Fixture()
+        let shortID = UUID()
+        let longID = UUID()
+        let data = Data(
+            """
+            {
+              "schemaVersion": 2,
+              "tasks": [
+                {"id":"\(longID.uuidString)","text":"旧长期","status":"pending","order":0,"createdAt":"1970-01-01T00:00:00Z","updatedAt":"1970-01-01T00:00:00Z","completedAt":null,"reminder":null,"group":"longTerm"},
+                {"id":"\(shortID.uuidString)","text":"旧短期","status":"pending","order":0,"createdAt":"1970-01-01T00:00:00Z","updatedAt":"1970-01-01T00:00:00Z","completedAt":null,"reminder":null,"group":"shortTerm"}
+              ]
+            }
+            """.utf8
+        )
+        try data.write(to: fixture.fileURL)
         let store = TaskStore(fileURL: fixture.fileURL)
-        let existing = try store.add(text: "长期起点", group: .longTerm)
-        let draft = TaskDraftState()
-        draft.present(after: existing.id, in: .longTerm)
-        draft.text = "长期新增一"
-        _ = try draft.submitAndContinue(to: store)
-        draft.text = "长期新增二"
-        let second = try draft.submitAndContinue(to: store)
-
-        try require(store.longTermTasks.map(\.text) == ["长期起点", "长期新增一", "长期新增二"],
-                    "长期任务连续新增没有留在长期分组")
-        try require(draft.afterID == second?.id, "连续新增没有更新分组内插入位置")
-        try require(draft.group == .longTerm, "连续新增丢失目标分组")
+        try require(
+            store.pendingTasks.map(\.text) == ["旧短期", "旧长期"],
+            "旧分组任务没有合并为统一顺序"
+        )
+        try require(store.pendingTasks.allSatisfy { $0.group == .shortTerm },
+                    "旧分组字段没有降级为兼容值")
+        let appended = try store.add(text: "新任务")
+        try require(store.pendingTasks.map(\.id).last == appended.id,
+                    "统一列表新增任务没有追加到末尾")
     }
 
     @MainActor

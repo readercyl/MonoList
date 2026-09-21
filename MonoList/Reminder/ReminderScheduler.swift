@@ -283,31 +283,18 @@ final class ReminderScheduler: ObservableObject {
             .map(\.0)
     }
 
-    static func lightReminderTasks(
-        in tasks: [TaskItem],
-        focusTaskIDs: [UUID]?
-    ) -> [TaskItem] {
-        let pendingTasks = tasks.filter { $0.status == .pending }
-        guard let focusTaskIDs else {
-            return Array(
-                pendingTasks
-                    .filter {
-                        $0.group == .shortTerm && $0.reminder == nil
+    static func lightReminderTasks(in tasks: [TaskItem]) -> [TaskItem] {
+        Array(
+            tasks
+                .filter { $0.status == .pending && $0.reminder == nil }
+                .sorted(by: { lhs, rhs in
+                    if lhs.order != rhs.order {
+                        return lhs.order < rhs.order
                     }
-                    .prefix(3)
-            )
-        }
-        let tasksByID = Dictionary(uniqueKeysWithValues: tasks.map { ($0.id, $0) })
-        let currentTask = focusTaskIDs
-            .compactMap { tasksByID[$0] }
-            .first { $0.status == .pending }
-        guard let currentTask,
-              currentTask.status == .pending,
-              currentTask.group == .shortTerm,
-              currentTask.reminder == nil else {
-            return []
-        }
-        return [currentTask]
+                    return lhs.id.uuidString < rhs.id.uuidString
+                })
+                .prefix(3)
+        )
     }
 
     static func dedicatedReminderDate(

@@ -62,7 +62,7 @@ struct SettingsValues: Codable, Equatable {
     var reminderStartMinuteOfDay = 9 * 60
     var reminderEndMinuteOfDay = 22 * 60
     var reminderPosition = ReminderPosition.topCenter
-    var reminderSoundEnabled: Bool? = true
+    var reminderSoundEnabled: Bool? = false
     var reminderSoundName = "Glass"
     var automaticUpdatesEnabled = true
     var launchAtLogin = false
@@ -110,7 +110,7 @@ struct SettingsValues: Codable, Equatable {
         reminderSoundEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .reminderSoundEnabled
-        ) ?? true
+        ) ?? false
         reminderSoundName = try container.decodeIfPresent(
             String.self,
             forKey: .reminderSoundName
@@ -160,7 +160,7 @@ final class AppSettings: ObservableObject {
     var reminderStartMinuteOfDay: Int { values.reminderStartMinuteOfDay }
     var reminderEndMinuteOfDay: Int { values.reminderEndMinuteOfDay }
     var reminderPosition: ReminderPosition { values.reminderPosition }
-    var reminderSoundEnabled: Bool { values.reminderSoundEnabled ?? true }
+    var reminderSoundEnabled: Bool { values.reminderSoundEnabled ?? false }
     var reminderSoundName: String { values.reminderSoundName }
     var automaticUpdatesEnabled: Bool { values.automaticUpdatesEnabled }
     var launchAtLogin: Bool { values.launchAtLogin }

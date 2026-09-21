@@ -1,56 +1,58 @@
 import AppKit
+import Combine
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum HomeSection: String {
+    case tasks
+    case settings
+}
+
+@MainActor
+final class HomePresentationState: ObservableObject {
+    @Published var section: HomeSection = .tasks
+}
+
 struct HomeView: View {
     @ObservedObject var store: TaskStore
-    @ObservedObject var focusStore: FocusStore
-    let onOpenSettings: () -> Void
-    let onFocusInteraction: () -> Void
+    @ObservedObject var presentation: HomePresentationState
+    @ObservedObject var settings: AppSettings
+    @ObservedObject var reminderScheduler: ReminderScheduler
+    @ObservedObject var loginItemController: LoginItemController
+    @ObservedObject var updater: AppUpdater
+    let onInstallUpdate: (AppUpdate) -> Void
+    let onTestReminder: () -> Void
     let onWindowReady: () -> Void
 
     @StateObject private var draftState = TaskDraftState()
     @State private var currentDate = Date()
-    @State private var selectedSection: HomeSection = .today
     @State private var collapsedTaskIDs: Set<UUID> = []
     @State private var selectedTaskID: UUID?
     @State private var editingTaskID: UUID?
     @State private var draftFocused = false
     @State private var draftRequestID = UUID()
     @State private var errorMessage: String?
-    @State private var focusPickerPresented = false
     @State private var showsOlderCompleted = false
+    @State private var clearAction: HomeClearAction?
     @StateObject private var dropCoordinator = TaskDropCoordinator()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var activeFocusIDs: [UUID] {
-        focusStore.taskIDs(at: currentDate)
-    }
-
-    private var activeFocusTasks: [TaskItem] {
-        let tasksByID = Dictionary(uniqueKeysWithValues: store.tasks.map { ($0.id, $0) })
-        return activeFocusIDs.compactMap { tasksByID[$0] }
-    }
-
-    private var focusSelectableTasks: [TaskItem] {
-        store.topLevelPendingTasks
-    }
-
-    private var currentFocusTask: TaskItem? {
-        activeFocusTasks.first { $0.status == .pending }
-    }
-
-    private var appDisplayName: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ??
-            "MonoList"
-    }
 
     private var todayCompletedRoots: [TaskItem] {
         store.completedTasks(on: currentDate).filter { $0.parentID == nil }
     }
 
-    private var olderCompletedRoots: [TaskItem] {
-        store.completedTasks(before: currentDate).filter { $0.parentID == nil }
+    private var olderCompletedGroups: [HomeCompletedGroup] {
+        let calendar = Calendar.current
+        let grouped = Dictionary(
+            grouping: store.completedTasks(before: currentDate).filter { $0.parentID == nil }
+        ) { calendar.startOfDay(for: $0.completedAt ?? $0.updatedAt) }
+        return grouped
+            .map { HomeCompletedGroup(date: $0.key, tasks: $0.value) }
+            .sorted { $0.date > $1.date }
+    }
+
+    private var hasOlderCompleted: Bool {
+        !olderCompletedGroups.isEmpty
     }
 
     var body: some View {
@@ -61,8 +63,10 @@ struct HomeView: View {
                     onRetry: { store.retryLoad() },
                     onQuit: { NSApp.terminate(nil) }
                 )
+            } else if presentation.section == .settings {
+                settingsContent
             } else {
-                homeContent
+                taskContent
             }
         }
         .alert(
@@ -75,6 +79,21 @@ struct HomeView: View {
             Button("好") { errorMessage = nil }
         } message: {
             Text(errorMessage ?? "")
+        }
+        .confirmationDialog(
+            clearAction?.title ?? "",
+            isPresented: Binding(
+                get: { clearAction != nil },
+                set: { if !$0 { clearAction = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(clearAction?.buttonTitle ?? "永久删除", role: .destructive) {
+                performClear()
+            }
+            Button("取消", role: .cancel) { clearAction = nil }
+        } message: {
+            Text(clearAction?.message ?? "")
         }
         .onAppear {
             syncDraftVisibility()
@@ -95,338 +114,204 @@ struct HomeView: View {
         }
     }
 
-    private var homeContent: some View {
-        HStack(spacing: 0) {
-            sidebar
-            Divider()
-            mainColumn
-        }
-        .background(Color(nsColor: .windowBackgroundColor))
-        .frame(minWidth: 720, minHeight: 480)
-    }
-
-    private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(appDisplayName)
-                    .font(.system(size: 17, weight: .semibold))
-                Text(currentDate, format: .dateTime.year().month().day().weekday())
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 20)
-            .padding(.bottom, 18)
-
-            Divider()
-
-            VStack(spacing: 3) {
-                HomeSidebarItem(
-                    title: "今天",
-                    systemImage: "calendar",
-                    count: nil,
-                    isSelected: selectedSection == .today,
-                    action: { selectSection(.today) }
-                )
-                HomeSidebarItem(
-                    title: "进行中",
-                    systemImage: "circle.dashed",
-                    count: store.pendingTasks.count,
-                    isSelected: selectedSection == .inProgress,
-                    action: { selectSection(.inProgress) }
-                )
-                HomeSidebarItem(
-                    title: "已完成",
-                    systemImage: "checkmark.circle",
-                    count: store.historyTasks.count,
-                    isSelected: selectedSection == .completed,
-                    action: { selectSection(.completed) }
-                )
-            }
-            .padding(.horizontal, 10)
-            .padding(.top, 12)
-
-            Spacer(minLength: 0)
-
-            Divider()
-
-            Button(action: onOpenSettings) {
-                HStack(spacing: 9) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 14, weight: .regular))
-                        .frame(width: 20)
-                    Text("设置")
-                        .font(.system(size: 13, weight: .medium))
-                    Spacer()
-                }
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 12)
-                .frame(height: 38)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("打开设置")
-            .padding(.horizontal, 10)
-            .padding(.vertical, 10)
-        }
-        .frame(width: 204)
-    }
-
-    private var mainColumn: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .bottom, spacing: 10) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("今天")
-                        .font(.system(size: 26, weight: .semibold))
-                    Text(currentDate, format: .dateTime.month().day().weekday())
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Button {
-                    beginRootDraft(in: .shortTerm)
-                } label: {
-                    Label("新增待办", systemImage: "plus")
-                }
-                .buttonStyle(HomeToolbarButtonStyle())
-                .help("新增待办")
-            }
-            .padding(.horizontal, 30)
-            .padding(.top, 25)
-            .padding(.bottom, 20)
-
-            Divider()
-
+    private var taskContent: some View {
+        VStack(spacing: 0) {
+            toolbar
+            Divider().opacity(0.45)
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 30) {
-                        focusSection
-                            .id(HomeSection.today.anchorID)
-                        taskGroupSection(.shortTerm, title: "短期任务")
-                            .id(HomeSection.inProgress.anchorID)
-                        taskGroupSection(.longTerm, title: "长期任务")
-                        completedSection
-                            .id(HomeSection.completed.anchorID)
-                    }
-                    .padding(.horizontal, 30)
-                    .padding(.vertical, 26)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    taskList
+                        .onTapGesture {
+                            clearInteraction()
+                        }
                 }
-                .onChange(of: selectedSection) { _, section in
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
-                        proxy.scrollTo(section.anchorID, anchor: .top)
+                .onChange(of: draftRequestID) { _, _ in
+                    DispatchQueue.main.async {
+                        withAnimation(.easeOut(duration: 0.16)) {
+                            proxy.scrollTo("home-task-draft-row", anchor: .bottom)
+                        }
+                        draftFocused = true
                     }
                 }
             }
+            .scrollBounceBehavior(.always, axes: .vertical)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    private var focusSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("专注")
-                        .font(.system(size: 17, weight: .semibold))
-                    Text(focusStatusText)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button("添加") {
-                    focusPickerPresented = true
-                }
-                .buttonStyle(HomeInlineButtonStyle())
-                .disabled(focusSelectableTasks.isEmpty && activeFocusTasks.isEmpty)
-                .popover(isPresented: $focusPickerPresented, arrowEdge: .top) {
-                    focusPicker
-                }
-                if !activeFocusTasks.isEmpty {
-                    Menu {
-                        Button("清空今日专注", action: clearFocusSelection)
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .frame(width: 28, height: 28)
-                    }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
-                    .buttonStyle(.plain)
-                    .help("更多专注操作")
-                }
-            }
-
-            if activeFocusTasks.isEmpty {
+    private var settingsContent: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
                 Button {
-                    focusPickerPresented = true
+                    presentation.section = .tasks
                 } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "scope")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(.secondary)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("还没有安排今天的专注")
-                                .font(.system(size: 13, weight: .medium))
-                            Text(
-                                focusSelectableTasks.isEmpty
-                                    ? "先添加一个待办"
-                                    : "从进行中的任务中选择最多三件"
-                            )
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(.horizontal, 15)
-                    .frame(minHeight: 62)
-                    .contentShape(Rectangle())
+                    Label("返回", systemImage: "chevron.left")
                 }
                 .buttonStyle(.plain)
-                .disabled(focusSelectableTasks.isEmpty)
-            } else if let currentFocusTask {
-                TaskRowView(
-                    item: currentFocusTask,
-                    onSave: { updateText(currentFocusTask, text: $0) },
-                    onComplete: { text in
-                        completeTask(currentFocusTask, finalText: text)
-                    },
-                    onDelete: { deleteTask(currentFocusTask) },
-                    onMoveUp: {},
-                    onMoveDown: {},
-                    onInsertAfter: {
-                        beginDraft(after: currentFocusTask.id, in: currentFocusTask.group)
-                    },
-                    onUpdateReminder: { updateReminder(currentFocusTask, reminder: $0) },
-                    onChangeGroup: { changeGroup(currentFocusTask) },
-                    focusOrder: activeFocusIDs.firstIndex(of: currentFocusTask.id).map { $0 + 1 },
-                    isSelected: false,
-                    onSelect: {},
-                    onEditingChanged: { _ in }
-                )
+                .help("返回待办")
 
-                ForEach(
-                    activeFocusTasks
-                        .drop(while: { $0.id != currentFocusTask.id })
-                        .dropFirst()
-                ) { item in
-                    if item.status == .pending {
-                        TaskRowView(
-                            item: item,
-                            onSave: { updateText(item, text: $0) },
-                            onComplete: { text in completeTask(item, finalText: text) },
-                            onDelete: { deleteTask(item) },
-                            onMoveUp: {},
-                            onMoveDown: {},
-                            onInsertAfter: {
-                                beginDraft(after: item.id, in: item.group)
-                            },
-                            onUpdateReminder: { updateReminder(item, reminder: $0) },
-                            onChangeGroup: { changeGroup(item) },
-                            focusOrder: activeFocusIDs.firstIndex(of: item.id).map { $0 + 1 },
-                            isSelected: false,
-                            onSelect: {},
-                            onEditingChanged: { _ in }
-                        )
-                    } else {
-                        HomeCompletedTaskRow(
-                            item: item,
-                            onRestore: { restoreTask(item) },
-                            onDelete: { deleteTask(item) },
-                            indentationLevel: 0
-                        )
-                    }
-                }
-            } else {
-                HStack(spacing: 10) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 19))
-                        .foregroundStyle(.secondary)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("今天的专注已完成")
-                            .font(.system(size: 13, weight: .medium))
-                        Text("其他待办仍可继续处理")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                WindowDragArea()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 30)
+
+                Text("设置")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 42)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 48)
+
+            Divider().opacity(0.45)
+
+            ScrollView {
+                SettingsView(
+                    settings: settings,
+                    taskStore: store,
+                    reminderScheduler: reminderScheduler,
+                    loginItemController: loginItemController,
+                    updater: updater,
+                    onInstallUpdate: onInstallUpdate,
+                    onTestReminder: onTestReminder
+                )
+                .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
             }
         }
-        .padding(16)
-        .background(
-            Color.primary.opacity(0.035),
-            in: RoundedRectangle(cornerRadius: 12)
-        )
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    @ViewBuilder
-    private func taskGroupSection(_ group: TaskGroup, title: String) -> some View {
-        let roots = store.topLevelPendingTasks(in: group)
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(title)
+    private var toolbar: some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("待办")
                     .font(.system(size: 17, weight: .semibold))
-                Text("\(store.pendingTasks.filter { $0.group == group }.count)")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.tertiary)
-                Spacer()
-                Button {
-                    beginRootDraft(in: group)
-                } label: {
-                    Image(systemName: "plus")
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help("新增\(title)")
+                Text(currentDate, format: .dateTime.month().day().weekday())
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
             }
 
-            if roots.isEmpty && !(draftState.isPresented && draftState.group == group) {
+            WindowDragArea()
+                .frame(maxWidth: .infinity)
+                .frame(height: 30)
+                .simultaneousGesture(
+                    TapGesture().onEnded { clearInteraction() }
+                )
+
+            Button {
+                beginRootDraft()
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 15))
+                    .frame(width: 30, height: 30)
+            }
+            .buttonStyle(HomeHeaderIconButtonStyle())
+            .help("新增待办")
+
+            Menu {
+                Button("清空未完成任务") { clearAction = .pending }
+                    .disabled(store.pendingTasks.isEmpty)
+                Button("清空已完成任务") { clearAction = .completed }
+                    .disabled(store.historyTasks.isEmpty)
+                Divider()
+                Button("清空全部任务", role: .destructive) { clearAction = .all }
+                    .disabled(store.tasks.isEmpty)
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 15))
+                    .frame(width: 30, height: 30)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .buttonStyle(HomeHeaderIconButtonStyle())
+            .help("更多操作")
+
+            Button {
+                clearInteraction()
+                presentation.section = .settings
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 15))
+                    .frame(width: 30, height: 30)
+            }
+            .buttonStyle(HomeHeaderIconButtonStyle())
+            .help("设置")
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 56)
+    }
+
+    private var taskList: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            pendingSection
+            completedSection
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private var pendingSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("未完成")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("\(store.pendingTasks.count)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+
+            let roots = store.topLevelPendingTasks
+            if roots.isEmpty && !(draftState.isPresented && draftState.parentID == nil) {
                 Text("还没有任务")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
-                    .padding(.vertical, 7)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
             }
 
             ForEach(Array(roots.enumerated()), id: \.element.id) { index, root in
                 taskTree(
                     for: root,
-                    lowerRootID: roots.indices.contains(index + 1)
-                        ? roots[index + 1].id
-                        : nil
+                    priorityRank: index < 3 ? index : nil
                 )
+                if draftState.isPresented,
+                   draftState.parentID == nil,
+                   draftState.afterID == root.id {
+                    draftRow(indentationLevel: 0)
+                }
             }
 
             if draftState.isPresented,
-               draftState.group == group,
-               draftState.parentID == nil {
+               draftState.parentID == nil,
+               draftState.afterID == nil {
                 draftRow(indentationLevel: 0)
             }
         }
     }
 
     @ViewBuilder
-    private func taskTree(for root: TaskItem, lowerRootID: UUID?) -> some View {
+    private func taskTree(for root: TaskItem, priorityRank: Int?) -> some View {
         let children = store.children(of: root.id)
         VStack(alignment: .leading, spacing: 1) {
             pendingTaskRow(
                 root,
                 indentationLevel: 0,
+                priorityRank: priorityRank,
                 hasSubtasks: !children.isEmpty,
                 dropParentID: nil,
                 dropUpperBeforeID: root.id,
-                dropLowerBeforeID: lowerRootID
+                dropLowerBeforeID: nil
             )
+
             if !collapsedTaskIDs.contains(root.id) {
                 ForEach(Array(children.enumerated()), id: \.element.id) { index, child in
                     if child.status == .pending {
                         pendingTaskRow(
                             child,
                             indentationLevel: 1,
+                            priorityRank: nil,
                             hasSubtasks: false,
                             dropParentID: root.id,
                             dropUpperBeforeID: child.id,
@@ -442,8 +327,14 @@ struct HomeView: View {
                             indentationLevel: 1
                         )
                     }
+                    if draftState.isPresented,
+                       draftState.parentID == root.id,
+                       draftState.afterID == child.id {
+                        draftRow(indentationLevel: 1)
+                    }
                 }
-                if draftState.isPresented && draftState.parentID == root.id {
+                if draftState.isPresented && draftState.parentID == root.id,
+                   draftState.afterID == nil {
                     draftRow(indentationLevel: 1)
                 }
             }
@@ -453,12 +344,13 @@ struct HomeView: View {
     private func pendingTaskRow(
         _ item: TaskItem,
         indentationLevel: Int,
+        priorityRank: Int?,
         hasSubtasks: Bool,
         dropParentID: UUID?,
         dropUpperBeforeID: UUID?,
         dropLowerBeforeID: UUID?
     ) -> some View {
-        return TaskRowView(
+        TaskRowView(
             item: item,
             onSave: { updateText(item, text: $0) },
             onComplete: { text in completeTask(item, finalText: text) },
@@ -466,14 +358,13 @@ struct HomeView: View {
             onMoveUp: { moveTask(item, by: -1) },
             onMoveDown: { moveTask(item, by: 1) },
             onInsertAfter: {
-                beginDraft(after: item.id, in: item.group, parentID: item.parentID)
+                beginDraft(after: item.id, parentID: item.parentID)
             },
             onUpdateReminder: { updateReminder(item, reminder: $0) },
-            onChangeGroup: { changeGroup(item) },
             isSelected: selectedTaskID == item.id,
             onSelect: { selectedTaskID = item.id },
-            onEditingChanged: { isEditing in
-                editingTaskID = isEditing ? item.id : nil
+            onEditingChanged: { editing in
+                editingTaskID = editing ? item.id : nil
             },
             indentationLevel: indentationLevel,
             hasSubtasks: hasSubtasks,
@@ -496,11 +387,12 @@ struct HomeView: View {
                     return true
                 }
             },
-            subtaskProgressText: store.subtaskProgressText(for: item.id)
+            subtaskProgressText: store.subtaskProgressText(for: item.id),
+            priorityRank: priorityRank
         )
         .overlay(alignment: .top) {
             if dropCoordinator.target == TaskDropTarget(
-                group: item.group,
+                group: .shortTerm,
                 beforeID: item.id,
                 parentID: dropParentID
             ) {
@@ -510,7 +402,7 @@ struct HomeView: View {
         .overlay(alignment: .bottom) {
             if dropLowerBeforeID == nil,
                dropCoordinator.target == TaskDropTarget(
-                   group: item.group,
+                   group: .shortTerm,
                    beforeID: nil,
                    parentID: dropParentID
                ) {
@@ -521,12 +413,12 @@ struct HomeView: View {
             dropCoordinator.beginDragging(task: item)
             return NSItemProvider(object: item.id.uuidString as NSString)
         } preview: {
-            HomeTaskDragPreview(text: item.text)
+            HomeTaskDragPreview(text: item.text, priorityRank: priorityRank)
         }
         .onDrop(
             of: [UTType.text],
             delegate: HomeTaskDropDelegate(
-                group: item.group,
+                group: .shortTerm,
                 parentID: dropParentID,
                 upperBeforeID: dropUpperBeforeID,
                 lowerBeforeID: dropLowerBeforeID,
@@ -540,39 +432,57 @@ struct HomeView: View {
     }
 
     private var completedSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .firstTextBaseline) {
                 Text("已完成")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                 Text("\(store.historyTasks.count)")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.tertiary)
                 Spacer()
-                Button(showsOlderCompleted ? "隐藏较早记录" : "显示较早记录") {
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
-                        showsOlderCompleted.toggle()
+                if hasOlderCompleted {
+                    Button(showsOlderCompleted ? "隐藏较早记录" : "显示较早记录") {
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
+                            showsOlderCompleted.toggle()
+                        }
                     }
+                    .buttonStyle(HomeInlineButtonStyle())
                 }
-                .buttonStyle(HomeInlineButtonStyle())
-                .disabled(olderCompletedRoots.isEmpty)
             }
+            .padding(.horizontal, 8)
 
-            if todayCompletedRoots.isEmpty && olderCompletedRoots.isEmpty {
+            if todayCompletedRoots.isEmpty && olderCompletedGroups.isEmpty {
                 Text("完成的任务会显示在这里")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
-                    .padding(.vertical, 7)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
             } else {
-                ForEach(todayCompletedRoots) { root in
-                    completedTree(for: root)
+                if !todayCompletedRoots.isEmpty {
+                    completedDateHeader(currentDate, isToday: true)
+                    ForEach(todayCompletedRoots) { root in
+                        completedTree(for: root)
+                    }
                 }
                 if showsOlderCompleted {
-                    ForEach(olderCompletedRoots) { root in
-                        completedTree(for: root)
+                    ForEach(olderCompletedGroups, id: \.date) { group in
+                        completedDateHeader(group.date, isToday: false)
+                        ForEach(group.tasks) { root in
+                            completedTree(for: root)
+                        }
                     }
                 }
             }
         }
+    }
+
+    private func completedDateHeader(_ date: Date, isToday: Bool) -> some View {
+        Text(isToday ? "今天" : date.formatted(.dateTime.year().month().day()))
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 8)
+            .padding(.top, 5)
+            .padding(.bottom, 1)
     }
 
     @ViewBuilder
@@ -600,90 +510,6 @@ struct HomeView: View {
         }
     }
 
-    private var focusStatusText: String {
-        guard !activeFocusTasks.isEmpty else { return "选择今天最重要的任务" }
-        let completed = activeFocusTasks.filter { $0.status == .history }.count
-        return "已完成 \(completed)/\(activeFocusTasks.count)"
-    }
-
-    private var focusPicker: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("添加到今日专注")
-                    .font(.system(size: 13, weight: .semibold))
-                Spacer()
-                Text("\(activeFocusIDs.count)/3")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-
-            Divider()
-
-            if focusSelectableTasks.isEmpty {
-                Text("先添加进行中的任务")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .padding(16)
-            } else {
-                ScrollView {
-                    VStack(spacing: 2) {
-                        ForEach(focusSelectableTasks) { item in
-                            let order = activeFocusIDs.firstIndex(of: item.id).map { $0 + 1 }
-                            Button {
-                                toggleFocusMembership(item)
-                            } label: {
-                                HStack(spacing: 9) {
-                                    if let order {
-                                        Text("\(order)")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundStyle(.white)
-                                            .frame(width: 20, height: 20)
-                                            .background(Color.primary, in: Circle())
-                                    } else {
-                                        Image(systemName: "circle")
-                                            .font(.system(size: 18))
-                                            .foregroundStyle(.secondary)
-                                            .frame(width: 20, height: 20)
-                                    }
-                                    Text(item.text)
-                                        .font(.system(size: 13))
-                                        .lineLimit(2)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(
-                                    order == nil
-                                        ? Color.clear
-                                        : Color.primary.opacity(0.045),
-                                    in: RoundedRectangle(cornerRadius: 8)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(order == nil && activeFocusIDs.count >= 3)
-                        }
-                    }
-                    .padding(8)
-                }
-                .frame(maxHeight: 300)
-            }
-
-            Divider()
-            Text("选择后立即生效，最多三件")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-        }
-        .frame(width: 320)
-    }
-
-    private func selectSection(_ section: HomeSection) {
-        selectedSection = section
-    }
-
     private func toggleExpanded(_ id: UUID) {
         withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
             if collapsedTaskIDs.contains(id) {
@@ -694,36 +520,31 @@ struct HomeView: View {
         }
     }
 
-    private func beginRootDraft(in group: TaskGroup) {
+    private func beginRootDraft() {
         commitDraft()
-        let lastRoot = store.topLevelPendingTasks(in: group).last
-        beginDraft(after: lastRoot?.id, in: group, parentID: nil)
+        beginDraft(after: store.topLevelPendingTasks.last?.id, parentID: nil)
     }
 
     private func beginSubtaskDraft(for parent: TaskItem) {
         commitDraft()
         collapsedTaskIDs.remove(parent.id)
-        let lastChild = store.children(of: parent.id).last
-        beginDraft(
-            after: lastChild?.id,
-            in: parent.group,
-            parentID: parent.id
-        )
+        beginDraft(after: store.children(of: parent.id).last?.id, parentID: parent.id)
     }
 
-    private func beginDraft(after id: UUID?, in group: TaskGroup, parentID: UUID? = nil) {
+    private func beginDraft(after id: UUID?, parentID: UUID?) {
         selectedTaskID = nil
         editingTaskID = nil
-        draftState.present(after: id, in: group, parentID: parentID)
+        draftState.present(after: id, in: .shortTerm, parentID: parentID)
         draftRequestID = UUID()
-        DispatchQueue.main.async {
-            draftFocused = true
-        }
+        DispatchQueue.main.async { draftFocused = true }
     }
 
     private func draftRow(indentationLevel: Int) -> some View {
         HStack(alignment: .center, spacing: 9) {
-            Color.clear.frame(width: 20, height: 28)
+            Color.clear.frame(
+                width: indentationLevel == 0 ? 0 : 20,
+                height: 28
+            )
             Image(systemName: "circle")
                 .font(.system(size: 17))
                 .foregroundStyle(.tertiary)
@@ -736,26 +557,26 @@ struct HomeView: View {
                 onOutdent: { outdentDraft() }
             )
             .onAppear {
-                DispatchQueue.main.async {
-                    draftFocused = true
-                }
+                DispatchQueue.main.async { draftFocused = true }
             }
             .onChange(of: draftFocused) { oldValue, newValue in
                 if oldValue && !newValue {
                     commitDraft()
                 }
             }
+            .padding(.vertical, 5)
+            Color.clear.frame(width: 28, height: 28)
         }
         .padding(.leading, CGFloat(indentationLevel) * 21 + 8)
         .padding(.trailing, 8)
-        .padding(.vertical, 5)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
-        .id(draftRequestID)
+        .padding(.vertical, 3)
+        .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 9))
+        .id("home-task-draft-row")
     }
 
     private func indentDraft() -> Bool {
         guard draftState.parentID == nil else { return false }
-        let roots = store.topLevelPendingTasks(in: draftState.group)
+        let roots = store.topLevelPendingTasks
         guard let afterID = draftState.afterID,
               let index = roots.firstIndex(where: { $0.id == afterID }),
               index > 0 else {
@@ -764,6 +585,7 @@ struct HomeView: View {
         let parent = roots[index - 1]
         draftState.parentID = parent.id
         draftState.afterID = store.children(of: parent.id).last?.id
+        collapsedTaskIDs.remove(parent.id)
         return true
     }
 
@@ -792,58 +614,57 @@ struct HomeView: View {
         do {
             _ = try draftState.submitAndContinue(to: store)
             draftRequestID = UUID()
-            DispatchQueue.main.async {
-                draftFocused = true
-            }
+            DispatchQueue.main.async { draftFocused = true }
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
+    private func clearInteraction() {
+        commitDraft()
+        selectedTaskID = nil
+        editingTaskID = nil
+        draftFocused = false
+        NSApp.keyWindow?.makeFirstResponder(nil)
+    }
+
     private func updateText(_ item: TaskItem, text: String) {
         performAction { try store.updateText(id: item.id, text: text) }
-        if activeFocusIDs.contains(item.id) {
-            onFocusInteraction()
-        }
     }
 
     @discardableResult
     private func completeTask(_ item: TaskItem, finalText: String) -> Bool {
-        let completed = performAction {
-            try store.complete(id: item.id, finalText: finalText)
-        }
-        if activeFocusIDs.contains(item.id) {
-            onFocusInteraction()
-        }
-        return completed
+        performAction { try store.complete(id: item.id, finalText: finalText) }
     }
 
     private func deleteTask(_ item: TaskItem) {
         performAction { try store.delete(id: item.id) }
         selectedTaskID = nil
-        if activeFocusIDs.contains(item.id) {
-            onFocusInteraction()
-        }
     }
 
     private func restoreTask(_ item: TaskItem) {
         performAction { try store.restore(id: item.id) }
-        if activeFocusIDs.contains(item.id) {
-            onFocusInteraction()
-        }
     }
 
     private func moveTask(_ item: TaskItem, by offset: Int) {
         performAction { try store.move(id: item.id, by: offset) }
     }
 
-    private func changeGroup(_ item: TaskItem) {
-        let group: TaskGroup = item.group == .shortTerm ? .longTerm : .shortTerm
-        performAction { try store.move(id: item.id, to: group, before: nil) }
-    }
-
     private func updateReminder(_ item: TaskItem, reminder: TaskReminder?) {
         performAction { try store.updateReminder(id: item.id, reminder: reminder) }
+    }
+
+    private func performClear() {
+        guard let clearAction else { return }
+        performAction {
+            switch clearAction {
+            case .pending: try store.clearPending()
+            case .completed: try store.clearHistory()
+            case .all: try store.clearAll()
+            }
+        }
+        selectedTaskID = nil
+        self.clearAction = nil
     }
 
     @discardableResult
@@ -865,98 +686,45 @@ struct HomeView: View {
             return false
         }
     }
-
-    private func toggleFocusMembership(_ item: TaskItem) {
-        var ids = activeFocusIDs
-        if let index = ids.firstIndex(of: item.id) {
-            ids.remove(at: index)
-        } else {
-            guard ids.count < 3 else { return }
-            ids.append(item.id)
-        }
-        do {
-            if ids.isEmpty {
-                try focusStore.clearSelection()
-            } else {
-                try focusStore.setSelection(
-                    ids,
-                    existingTaskIDs: Set(store.tasks.map(\.id)),
-                    completedTaskIDs: Set(store.historyTasks.map(\.id)),
-                    at: currentDate
-                )
-            }
-            onFocusInteraction()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func clearFocusSelection() {
-        performAction { try focusStore.clearSelection() }
-        focusPickerPresented = false
-        onFocusInteraction()
-    }
 }
 
-private enum HomeSection: String {
-    case today
-    case inProgress
+private enum HomeClearAction {
+    case pending
     case completed
+    case all
 
-    var anchorID: String { "home-section-\(rawValue)" }
-}
-
-private struct HomeSidebarItem: View {
-    let title: String
-    let systemImage: String
-    let count: Int?
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 9) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 14, weight: .regular))
-                    .frame(width: 20)
-                Text(title)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                Spacer()
-                if let count {
-                    Text("\(count)")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(isSelected ? .secondary : .tertiary)
-                }
-            }
-            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
-            .padding(.horizontal, 10)
-            .frame(height: 34)
-            .background(
-                isSelected ? Color.primary.opacity(0.08) : Color.clear,
-                in: RoundedRectangle(cornerRadius: 8)
-            )
-            .contentShape(Rectangle())
+    var title: String {
+        switch self {
+        case .pending: return "清空未完成任务？"
+        case .completed: return "清空已完成任务？"
+        case .all: return "清空全部任务？"
         }
-        .buttonStyle(.plain)
     }
+
+    var buttonTitle: String {
+        switch self {
+        case .pending: return "删除所有未完成任务"
+        case .completed: return "删除所有已完成任务"
+        case .all: return "删除全部任务"
+        }
+    }
+
+    var message: String { "此操作会立即永久删除对应任务，且无法撤销。" }
 }
 
-private struct HomeToolbarButtonStyle: ButtonStyle {
+private struct HomeCompletedGroup {
+    let date: Date
+    let tasks: [TaskItem]
+}
+
+private struct HomeHeaderIconButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(Color.primary)
-            .padding(.horizontal, 11)
-            .frame(height: 30)
-            .background(
-                configuration.isPressed
-                    ? Color.primary.opacity(0.11)
-                    : Color.primary.opacity(0.06),
-                in: RoundedRectangle(cornerRadius: 7)
-            )
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .foregroundStyle(.primary)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .opacity(configuration.isPressed ? 0.78 : 1)
             .animation(
                 reduceMotion ? nil : .easeOut(duration: 0.08),
                 value: configuration.isPressed
@@ -967,10 +735,10 @@ private struct HomeToolbarButtonStyle: ButtonStyle {
 private struct HomeInlineButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12, weight: .medium))
+            .font(.system(size: 11, weight: .medium))
             .foregroundStyle(configuration.isPressed ? Color.primary : Color.secondary)
             .padding(.horizontal, 8)
-            .frame(minHeight: 28)
+            .frame(minHeight: 26)
             .background(
                 configuration.isPressed ? Color.primary.opacity(0.08) : Color.clear,
                 in: RoundedRectangle(cornerRadius: 7)
@@ -1018,11 +786,10 @@ private struct HomeCompletedTaskRow: View {
                         .frame(width: 20, height: 28)
                 }
                 .buttonStyle(.plain)
-                .help(isExpanded ? "隐藏子任务" : "展开子任务")
-                .accessibilityLabel(isExpanded ? "隐藏子任务" : "展开子任务")
             } else if indentationLevel > 0 {
                 Color.clear.frame(width: 20, height: 28)
             }
+
             Button(action: onRestore) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 18))
@@ -1062,6 +829,7 @@ private struct HomeCompletedTaskRow: View {
 
 private struct HomeTaskDragPreview: View {
     let text: String
+    let priorityRank: Int?
 
     var body: some View {
         HStack(spacing: 9) {
@@ -1070,7 +838,7 @@ private struct HomeTaskDragPreview: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 28)
             Text(text)
-                .font(.system(size: 13))
+                .font(.system(size: fontSize, weight: fontWeight))
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -1082,6 +850,19 @@ private struct HomeTaskDragPreview: View {
             in: RoundedRectangle(cornerRadius: 8)
         )
         .shadow(color: .black.opacity(0.14), radius: 6, y: 2)
+    }
+
+    private var fontSize: CGFloat {
+        switch priorityRank {
+        case 0: return 18
+        case 1: return 16
+        case 2: return 14
+        default: return 13
+        }
+    }
+
+    private var fontWeight: Font.Weight {
+        priorityRank == 0 ? .semibold : .regular
     }
 }
 
@@ -1160,19 +941,16 @@ private struct HomeTaskDropDelegate: DropDelegate {
 
     private func accepts(sourceTask: TaskItem) -> Bool {
         if let parentID {
-            return sourceTask.parentID == parentID && sourceTask.group == group
+            return sourceTask.parentID == parentID
         }
         return sourceTask.parentID == nil
     }
 
     private func updateTarget(_ info: DropInfo) {
         guard let sessionID else { return }
-        let target = coordinator.dropTarget(
+        let target = TaskDropTarget(
             group: group,
-            upperBeforeID: upperBeforeID,
-            lowerBeforeID: lowerBeforeID,
-            locationY: info.location.y,
-            rowHeight: rowHeight,
+            beforeID: info.location.y < rowHeight / 2 ? upperBeforeID : lowerBeforeID,
             parentID: parentID
         )
         guard coordinator.target != target else { return }
@@ -1182,5 +960,16 @@ private struct HomeTaskDropDelegate: DropDelegate {
             parentID: target.parentID,
             sessionID: sessionID
         )
+    }
+}
+
+private struct WindowDragArea: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { HomeDraggingNSView() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+private final class HomeDraggingNSView: NSView {
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
     }
 }

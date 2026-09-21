@@ -5,6 +5,8 @@ enum TaskStatus: String, Codable {
     case history
 }
 
+// Kept only so older tasks.json files remain readable. The current product
+// presents one unified pending-task order and no longer exposes this field.
 enum TaskGroup: String, Codable, CaseIterable {
     case shortTerm
     case longTerm

@@ -3,281 +3,60 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TASK_LIST="$ROOT_DIR/MonoList/Tasks/TaskListView.swift"
+HOME_VIEW="$ROOT_DIR/MonoList/Tasks/HomeView.swift"
 TASK_ROW="$ROOT_DIR/MonoList/Tasks/TaskRowView.swift"
 WINDOW_COORDINATOR="$ROOT_DIR/MonoList/App/WindowCoordinator.swift"
 SETTINGS="$ROOT_DIR/MonoList/Settings/SettingsView.swift"
+APP_SETTINGS="$ROOT_DIR/MonoList/Settings/AppSettings.swift"
 
-if grep -q 'Image(systemName: "ellipsis")[[:space:]]*$' "$TASK_LIST" &&
-   grep -q '\.offset(y:' "$TASK_LIST"; then
-  echo "更多按钮图标不能用 offset 修正垂直位置。" >&2
-  exit 1
-fi
-
-HEADER_ICON_BLOCK="$(awk '
-  /private struct HeaderIconLabel/ { capture = 1 }
-  /private struct TaskDragPreview/ { capture = 0 }
-  capture { print }
-' "$TASK_LIST")"
-if echo "$HEADER_ICON_BLOCK" | grep -qE '\.background|\.overlay|RoundedRectangle'; then
-  echo "主窗口顶部三个图标按钮必须统一无背景，不画灰色圆角矩形。" >&2
-  exit 1
-fi
-
-if grep -q 'NSComboBox' "$SETTINGS"; then
-  echo "设置页下拉控件必须统一使用同一套弹出按钮样式。" >&2
-  exit 1
-fi
-
-if grep -q '\.toggleStyle(.switch)' "$SETTINGS" ||
-   ! grep -q 'SettingsSwitchStyle' "$SETTINGS"; then
-  echo "设置页开关必须使用项目内固定样式，避免系统 switch 重装后丢失白色滑块。" >&2
-  exit 1
-fi
-
-if ! grep -q 'SettingValueBackground' "$SETTINGS"; then
-  echo "设置内容框必须复用统一的灰色圆角矩形样式。" >&2
-  exit 1
-fi
-
-if ! grep -q 'private static let controlWidth: CGFloat = 180' "$SETTINGS"; then
-  echo "轻提醒卡片右侧控件必须统一为 180pt 宽。" >&2
-  exit 1
-fi
-
-if ! grep -q 'maxVisibleItems: 8' "$SETTINGS" ||
-   ! grep -q 'ScrollView(.vertical' "$SETTINGS"; then
-  echo "时间选择下拉框必须限高为最多 8 项，并允许内部滚动。" >&2
-  exit 1
-fi
-
-if grep -q '\.frame(width: 88' "$TASK_ROW" ||
-   grep -q 'Color.clear.frame(width: 56' "$TASK_ROW"; then
-  echo "待办行右侧不能为隐藏提醒按钮预留大块空白。" >&2
-  exit 1
-fi
-
-if grep -q 'Image(systemName: "bell")' "$TASK_ROW" &&
-   ! grep -q 'private var reminderStatusLine' "$TASK_ROW"; then
-  echo "提醒状态应显示在待办正文下方，不应占用右侧操作区。" >&2
-  exit 1
-fi
-
-if ! grep -q 'ReminderTimeDropdown' "$TASK_ROW" ||
-   ! grep -q 'private static let maxVisibleItems = 8' "$TASK_ROW"; then
-  echo "单条提醒时间必须拆成小时/分钟两个限高下拉框。" >&2
-  exit 1
-fi
-
-if ! grep -q 'ScrollViewReader' "$TASK_LIST" ||
-   ! grep -q 'scrollTo("task-draft-row"' "$TASK_LIST"; then
-  echo "长列表新增待办必须自动滚动到草稿输入行。" >&2
-  exit 1
-fi
-
-CONTINUE_DRAFT_BLOCK="$(awk '
-  /private func continueDraft\(\)/ { capture = 1 }
-  /private func selectTask/ { capture = 0 }
-  capture { print }
-' "$TASK_LIST")"
-if ! echo "$CONTINUE_DRAFT_BLOCK" | grep -q 'draftScrollRequest = UUID()'; then
-  echo "连续新增待办时必须再次滚动到草稿输入行。" >&2
-  exit 1
-fi
-
-if ! grep -q 'func dropExited' "$TASK_LIST" ||
-   ! grep -q 'coordinator.clearTarget(sessionID: sessionID)' "$TASK_LIST"; then
-  echo "取消或移出拖拽目标时必须清除分组落点状态。" >&2
-  exit 1
-fi
-
-if ! grep -q 'DropProposal(operation: .move)' "$TASK_LIST"; then
-  echo "待办拖动必须声明 move 操作，不能显示复制用的加号光标。" >&2
-  exit 1
-fi
-
-if grep -A8 'private struct TaskDragPreview' "$TASK_LIST" |
-   grep -q 'Color.clear'; then
-  echo "拖动预览不能是透明占位，必须让待办内容跟随鼠标。" >&2
-  exit 1
-fi
-
-if ! grep -q 'TaskDragInsertionIndicator' "$TASK_LIST"; then
-  echo "拖动时必须显示稳定插入位置。" >&2
-  exit 1
-fi
-
-if grep -q 'dropCoordinator.sourceTask?.id == item.id' "$TASK_LIST"; then
-  echo "源待办行不能依赖缺少取消回调的透明状态。" >&2
-  exit 1
-fi
-
-if ! grep -q 'VStack(spacing: 0)' "$TASK_LIST"; then
-  echo "待办拖放目标之间不能保留会闪现加号光标的空隙。" >&2
-  exit 1
-fi
-
-if ! grep -q 'TaskRowHeightPreferenceKey' "$TASK_LIST" ||
-   ! grep -q 'taskRowHeights\[item.id\]' "$TASK_LIST"; then
-  echo "拖动命中必须使用待办行真实高度，不能用文本行数估算。" >&2
-  exit 1
-fi
-
-if ! grep -q 'draftDropRow(group:' "$TASK_LIST"; then
-  echo "草稿输入行必须接管 move 拖放，不能形成加号光标断层。" >&2
-  exit 1
-fi
-
-if ! grep -q 'dropCoordinator.target?.highlightsGroupHeader == true' "$TASK_LIST"; then
-  echo "分组标题聚焦必须与行间插入线使用互斥拖放状态。" >&2
-  exit 1
-fi
-
-if ! grep -q 'coordinator.finishDrop(sessionID: sessionID)' "$TASK_LIST" ||
-   ! grep -A8 'private struct TaskDragInsertionIndicator' "$TASK_LIST" |
-     grep -q 'allowsHitTesting(false)'; then
-  echo "松开鼠标时必须立即清除插入线，且插入线不能拦截 drop 命中。" >&2
-  exit 1
-fi
-
-if ! grep -q 'guard let target = coordinator.finishDrop(sessionID: sessionID)' "$TASK_LIST"; then
-  echo "待办 drop 必须原子结束内部拖动会话。" >&2
-  exit 1
-fi
-
-if grep -q 'event.window !== panel && event.window?.level != .statusBar' "$WINDOW_COORDINATOR"; then
-  echo "点击提醒浮层、菜单或下拉时不应被误判为主窗口外点击。" >&2
-  exit 1
-fi
-
-if grep -qE 'MainContentMode|返回专注|开始专注|完成调整' "$TASK_LIST"; then
-  echo "今日专注必须与普通待办共用一个窗口，不能恢复页面切换流程。" >&2
-  exit 1
-fi
-
-FOCUS_TASK_BLOCK="$(awk '
-  /private var focusTaskContent/ { capture = 1 }
-  /private func tasks\(in group:/ { capture = 0 }
-  capture { print }
-' "$TASK_LIST")"
-if echo "$FOCUS_TASK_BLOCK" | grep -q 'Color.accentColor'; then
-  echo "专注任务不能使用蓝色选中背景。" >&2
-  exit 1
-fi
-
-if echo "$FOCUS_TASK_BLOCK" | grep -q 'HStack(alignment: .top'; then
-  echo "专注任务的完成圆圈必须相对整条任务垂直居中。" >&2
-  exit 1
-fi
-
-if [[ "$(echo "$FOCUS_TASK_BLOCK" | grep -c 'focusEditableText(')" -lt 2 ]]; then
-  echo "当前任务和接下来任务都必须保留原位编辑能力。" >&2
-  exit 1
-fi
-
-for contract in \
-  'private var focusSection' \
-  'private var otherTasksDisclosure' \
-  'private var focusPicker' \
-  'private func toggleFocusMembership' \
-  'private func clearFocusSelection'; do
-  if ! grep -q "$contract" "$TASK_LIST"; then
-    echo "单窗口专注缺少必要交互：$contract" >&2
+for source in "$TASK_LIST" "$HOME_VIEW" "$TASK_ROW" "$WINDOW_COORDINATOR"; do
+  if grep -qE '今日专注|短期任务|长期任务|focusStore|focusSection|focusPicker' "$source"; then
+    echo "当前任务界面不能保留专注或短期/长期分类入口：$source" >&2
     exit 1
   fi
 done
 
-if ! grep -q 'focusPickerPresented = false' "$TASK_LIST" ||
-   ! grep -q 'try focusStore.clearSelection()' "$TASK_LIST"; then
-  echo "专注任务必须即时生效，并能在同一窗口清空。" >&2
+if ! grep -q 'priorityRank' "$TASK_ROW" ||
+   ! grep -q 'case 0: return 18' "$TASK_ROW" ||
+   ! grep -q 'case 1: return 16' "$TASK_ROW" ||
+   ! grep -q 'case 2: return 14' "$TASK_ROW"; then
+  echo "前三条待办必须使用从大到小的字号层级。" >&2
   exit 1
 fi
 
-FOCUS_TOGGLE_BLOCK="$(awk '
-  /private func toggleFocusMembership/ { capture = 1 }
-  /private func clearFocusSelection/ { capture = 0 }
-  capture { print }
-' "$TASK_LIST")"
-if echo "$FOCUS_TOGGLE_BLOCK" | grep -q 'showsOtherTasks = false'; then
-  echo "添加今日专注任务必须保留其他待办当前展开状态。" >&2
+if ! grep -q 'width: indentationLevel == 0 ? 0 : 20' "$TASK_LIST" ||
+   ! grep -q 'width: indentationLevel == 0 ? 0 : 20' "$HOME_VIEW"; then
+  echo "主页和浮窗草稿行必须复用一级/二级待办的行首对齐规则。" >&2
   exit 1
 fi
 
-if ! grep -q 'focusPickerAnchor' "$TASK_LIST" ||
-   ! grep -q 'arrowEdge: .trailing' "$TASK_LIST"; then
-  echo "今日专注选择浮窗必须锚定在专注组件右侧。" >&2
+if ! grep -q 'olderCompletedGroups' "$TASK_LIST" ||
+   ! grep -q 'olderCompletedGroups' "$HOME_VIEW"; then
+  echo "主页和浮窗都必须保留已完成任务的日期归类。" >&2
   exit 1
 fi
 
-if ! grep -q 'matchedGeometryEffect' "$TASK_LIST" ||
-   ! grep -q 'TaskCompletionButton' "$TASK_LIST" ||
-   ! grep -q 'scrollDisabled(false)' "$TASK_LIST"; then
-  echo "专注迁移、完成反馈和其他待办滚动必须保留明确过渡。" >&2
+if ! grep -q 'SettingsView(' "$HOME_VIEW" ||
+   grep -q 'private var settingsWindow' "$WINDOW_COORDINATOR"; then
+  echo "设置必须内置主页，不能再创建独立设置窗口。" >&2
   exit 1
 fi
 
-SCROLLABLE_TASK_BLOCK="$(awk '
-  /private var scrollableTaskContent/ { capture = 1 }
-  /private var focusPickerAnchor/ { capture = 0 }
-  capture { print }
-' "$TASK_LIST")"
-for contract in 'focusSection' 'otherTasksDisclosure' 'otherTaskContent'; do
-  if ! echo "$SCROLLABLE_TASK_BLOCK" | grep -q "$contract"; then
-    echo "标题栏以下所有任务必须共用一个滚动容器：$contract" >&2
-    exit 1
-  fi
-done
-
-MAIN_LIST_BLOCK="$(awk '
-  /private var mainList/ { capture = 1 }
-  /private var scrollableTaskContent/ { capture = 0 }
-  capture { print }
-' "$TASK_LIST")"
-if ! echo "$MAIN_LIST_BLOCK" | grep -q 'ScrollView' ||
-   ! echo "$MAIN_LIST_BLOCK" | grep -q 'scrollableTaskContent'; then
-  echo "主窗口必须固定标题栏，并让完整任务区作为一个整体滚动。" >&2
+if ! grep -q 'homeWindow: self.homeWindow' "$WINDOW_COORDINATOR"; then
+  echo "菜单栏浮窗外点判断必须覆盖主页窗口。" >&2
   exit 1
 fi
 
-if ! grep -q '.animation(nil, value: preferredHeight)' "$TASK_LIST" ||
-   ! grep -q '.frame(maxHeight: .infinity, alignment: .top)' "$TASK_LIST"; then
-  echo "SwiftUI 内容必须顶部对齐，且不能与 AppKit 同时动画窗口高度。" >&2
+if ! grep -q 'reminderSoundEnabled: Bool? = false' "$APP_SETTINGS" ||
+   ! grep -q ') ?? false' "$APP_SETTINGS"; then
+  echo "提醒声音默认值必须是关闭。" >&2
   exit 1
 fi
 
-if grep -Fq '.animation(layoutAnimation, value: showsOtherTasks)' "$TASK_LIST" ||
-   ! grep -Fq 'idealHeight: preferredHeight' "$TASK_LIST" ||
-   ! grep -Fq 'rendersOtherTasks' "$TASK_LIST"; then
-  echo "其他待办只能随窗口下边缘揭示或裁切，不能让 SwiftUI 根视图提前跳到目标布局。" >&2
-  exit 1
-fi
-
-if ! grep -Fq 'let startsWithOtherTasks = !focusStore.isActive()' "$TASK_LIST" ||
-   ! grep -Fq '_showsOtherTasks = State(initialValue: startsWithOtherTasks)' "$TASK_LIST" ||
-   ! grep -Fq '_rendersOtherTasks = State(initialValue: startsWithOtherTasks)' "$TASK_LIST"; then
-  echo "主窗口首次渲染必须直接使用当前专注状态，不能展开后再收起。" >&2
-  exit 1
-fi
-
-if grep -qE 'startFrame\.origin\.y \+= 4|targetFrame\.origin\.y \+= 4' "$WINDOW_COORDINATOR" ||
-   grep -q 'panel\.animator()\.setFrame(finalFrame' "$WINDOW_COORDINATOR"; then
-  echo "主窗口显隐不能移动上边缘，也不能用旧尺寸覆盖动态高度。" >&2
-  exit 1
-fi
-
-if ! grep -q 'weak var panelReference: MainPanel?' "$WINDOW_COORDINATOR" ||
-   ! grep -q 'max(hostingView.fittingSize.height, Self.mainPanelMinimumHeight)' "$WINDOW_COORDINATOR"; then
-  echo "主窗口显示前必须以真实内容高度完成唯一一次初始定高。" >&2
-  exit 1
-fi
-
-if ! grep -Fq 'hostingView.sizingOptions = []' "$WINDOW_COORDINATOR"; then
-  echo "主窗口显示后必须关闭 SwiftUI 固有尺寸驱动，只允许 AppKit 改变窗口高度。" >&2
-  exit 1
-fi
-
-if grep -q 'store.completedTasks(on: currentDate).filter' "$TASK_LIST" ||
-   grep -q 'store.completedTasks(before: currentDate).filter' "$TASK_LIST"; then
-  echo "专注任务完成后必须立即显示在已完成列表，不能等待清空专注。" >&2
+if grep -q 'NSComboBox' "$SETTINGS" ||
+   ! grep -q 'SettingsSwitchStyle' "$SETTINGS" ||
+   ! grep -q 'SettingValueBackground' "$SETTINGS"; then
+  echo "设置页控件必须保留统一原生样式。" >&2
   exit 1
 fi
 

@@ -35,7 +35,6 @@ if git rev-parse "$VERSION" >/dev/null 2>&1; then
 fi
 
 bash scripts/check-task-store.sh
-bash scripts/check-focus-store.sh
 bash scripts/check-task-drop-coordinator.sh
 bash scripts/check-app-settings.sh
 bash scripts/check-ui-source-style.sh

@@ -8,8 +8,6 @@ final class ReminderPresentationModel: ObservableObject {
 
 struct ReminderView: View {
     var title = "待办提醒"
-    var statusText: String?
-    var isFocusReminder = false
     let totalCount: Int
     let taskTexts: [String]
     @ObservedObject var model: ReminderPresentationModel
@@ -17,58 +15,8 @@ struct ReminderView: View {
     let onClose: () -> Void
 
     var body: some View {
-        Group {
-            if isFocusReminder {
-                focusReminder
-            } else {
-                standardReminder
-            }
-        }
+        standardReminder
         .onHover { model.isPaused = $0 }
-    }
-
-    private var focusReminder: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 8) {
-                Text(title)
-                    .font(.system(size: 12, weight: .semibold))
-                if let statusText {
-                    Text(statusText)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.tertiary)
-                }
-                Spacer()
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 28, height: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .offset(x: 6, y: -6)
-                .accessibilityLabel("关闭提醒")
-            }
-
-            Button(action: onOpen) {
-                Text(taskTexts.first ?? "")
-                    .font(.system(size: 22, weight: .semibold))
-                    .tracking(-0.35)
-                    .lineSpacing(3)
-                    .lineLimit(3)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 12)
-        }
-        .padding(.horizontal, 22)
-        .padding(.top, 20)
-        .padding(.bottom, 21)
-        .frame(width: 420, alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 17))
     }
 
     private var standardReminder: some View {
@@ -77,7 +25,7 @@ struct ReminderView: View {
                 Text(title)
                     .font(.headline)
                 Spacer()
-                Text(statusText ?? "\(totalCount) 项")
+                Text("\(totalCount) 项")
                     .foregroundStyle(.secondary)
                 Button(action: onClose) {
                     Image(systemName: "xmark")

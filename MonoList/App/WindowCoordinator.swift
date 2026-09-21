@@ -6,9 +6,8 @@ final class WindowCoordinator {
     static let mainPanelWidth: CGFloat = 336
     static let mainPanelMinimumHeight: CGFloat = 106
     static let mainPanelMaximumHeight: CGFloat = 447
-    static let settingsWindowWidth: CGFloat = 430
-    static let homeWindowDefaultSize = NSSize(width: 880, height: 620)
-    static let homeWindowMinimumSize = NSSize(width: 720, height: 480)
+    static let homeWindowDefaultSize = NSSize(width: 400, height: 720)
+    static let homeWindowMinimumSize = NSSize(width: 360, height: 520)
     static let homeWindowAutosaveName = "MonoList.HomeWindow"
 
     static var appDisplayName: String {
@@ -34,9 +33,9 @@ final class WindowCoordinator {
     static func shouldCloseMainPanel(
         clickedWindow: NSWindow?,
         mainPanel: NSWindow,
-        settingsWindow: NSWindow?
+        homeWindow: NSWindow?
     ) -> Bool {
-        clickedWindow !== mainPanel && clickedWindow === settingsWindow
+        clickedWindow !== mainPanel && clickedWindow === homeWindow
     }
 
     static func fallbackMainPanelAnchor(
@@ -49,12 +48,9 @@ final class WindowCoordinator {
         )
     }
 
-    var onOpenSettings: (() -> Void)?
     var onWillShowMainPanel: (() -> Void)?
-    var onFocusInteraction: (() -> Void)?
 
     private let taskStore: TaskStore
-    private let focusStore: FocusStore
     private let draftState = TaskDraftState()
     private var mainPanel: MainPanel?
     private var globalOutsideClickMonitor: Any?
@@ -62,8 +58,8 @@ final class WindowCoordinator {
     private var mainPanelResizeTimer: Timer?
     private var pendingResizeWorkItem: DispatchWorkItem?
     private weak var previousApplication: NSRunningApplication?
-    private var settingsWindow: NSWindow?
     private var homeWindow: NSWindow?
+    private let homePresentationState = HomePresentationState()
     private var settings: AppSettings?
     private var reminderScheduler: ReminderScheduler?
     private var loginItemController: LoginItemController?
@@ -78,16 +74,15 @@ final class WindowCoordinator {
     }
 
     var isSettingsVisible: Bool {
-        settingsWindow?.isVisible == true
+        homeWindow?.isVisible == true && homePresentationState.section == .settings
     }
 
     var isHomeVisible: Bool {
         homeWindow?.isVisible == true
     }
 
-    init(taskStore: TaskStore, focusStore: FocusStore) {
+    init(taskStore: TaskStore) {
         self.taskStore = taskStore
-        self.focusStore = focusStore
     }
 
     static func preferredMainPanelHeight(
@@ -144,9 +139,6 @@ final class WindowCoordinator {
         self.updater = updater
         self.onInstallUpdate = onInstallUpdate
         self.onTestReminder = onTestReminder
-        onOpenSettings = { [weak self] in
-            self?.showSettings()
-        }
     }
 
     func toggleMainPanel(relativeTo button: NSStatusBarButton) {
@@ -293,76 +285,18 @@ final class WindowCoordinator {
     }
 
     func showSettings() {
+        showHome(showSettings: true)
+    }
+
+    func showHome(showSettings: Bool = false) {
         closeMainPanel()
-        guard let settings,
+        homePresentationState.section = showSettings ? .settings : .tasks
+        guard let settingsValue = self.settings,
               let reminderScheduler,
               let loginItemController,
               let updater else {
             return
         }
-
-        if let settingsWindow {
-            NSApp.activate(ignoringOtherApps: true)
-            settingsWindow.makeKeyAndOrderFront(nil)
-            return
-        }
-
-        let window = NSWindow(
-            contentRect: NSRect(
-                x: 0,
-                y: 0,
-                width: Self.settingsWindowWidth,
-                height: 400
-            ),
-            styleMask: [.titled, .closable, .miniaturizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "\(Self.appDisplayName) 控制台"
-        window.titleVisibility = .hidden
-        let titleController = NSTitlebarAccessoryViewController()
-        titleController.layoutAttribute = .left
-        let titleLabel = NSTextField(labelWithString: window.title)
-        titleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        let titleContainer = NSView(
-            frame: NSRect(x: 0, y: 0, width: 150, height: 22)
-        )
-        titleContainer.addSubview(titleLabel)
-        NSLayoutConstraint.activate([
-            titleLabel.leadingAnchor.constraint(equalTo: titleContainer.leadingAnchor),
-            titleLabel.centerYAnchor.constraint(equalTo: titleContainer.centerYAnchor),
-        ])
-        titleController.view = titleContainer
-        window.addTitlebarAccessoryViewController(titleController)
-        window.center()
-        window.isReleasedWhenClosed = false
-        let hostingView = NSHostingView(
-            rootView: SettingsView(
-                settings: settings,
-                taskStore: taskStore,
-                focusStore: focusStore,
-                reminderScheduler: reminderScheduler,
-                loginItemController: loginItemController,
-                updater: updater,
-                onInstallUpdate: onInstallUpdate ?? { _ in },
-                onTestReminder: onTestReminder ?? {}
-            )
-        )
-        window.contentView = hostingView
-        window.setContentSize(
-            NSSize(
-                width: Self.settingsWindowWidth,
-                height: max(300, hostingView.fittingSize.height)
-            )
-        )
-        settingsWindow = window
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
-    }
-
-    func showHome() {
-        closeMainPanel()
 
         if let homeWindow {
             NSApp.activate(ignoringOtherApps: true)
@@ -370,7 +304,7 @@ final class WindowCoordinator {
             return
         }
 
-        let window = NSWindow(
+        let window = HomeWindow(
             contentRect: NSRect(
                 origin: .zero,
                 size: Self.homeWindowDefaultSize
@@ -387,13 +321,13 @@ final class WindowCoordinator {
         let hostingView = NSHostingView(
             rootView: HomeView(
                 store: taskStore,
-                focusStore: focusStore,
-                onOpenSettings: { [weak self] in
-                    self?.showSettings()
-                },
-                onFocusInteraction: { [weak self] in
-                    self?.onFocusInteraction?()
-                },
+                presentation: homePresentationState,
+                settings: settingsValue,
+                reminderScheduler: reminderScheduler,
+                loginItemController: loginItemController,
+                updater: updater,
+                onInstallUpdate: onInstallUpdate ?? { _ in },
+                onTestReminder: onTestReminder ?? {},
                 onWindowReady: { [weak window] in
                     DispatchQueue.main.async {
                         window?.contentMinSize = Self.homeWindowMinimumSize
@@ -437,7 +371,6 @@ final class WindowCoordinator {
         let hostingView = MainPanelHostingView(
             rootView: TaskListView(
                 store: taskStore,
-                focusStore: focusStore,
                 draftState: draftState,
                 onClose: { [weak self] in
                     self?.closeMainPanel(restoringFocus: true)
@@ -445,9 +378,6 @@ final class WindowCoordinator {
                 onOpenHome: { [weak self] in
                     self?.closeMainPanel()
                     self?.showHome()
-                },
-                onFocusInteraction: { [weak self] in
-                    self?.onFocusInteraction?()
                 },
                 onHeightChanged: { [weak self] height in
                     guard let self, let panel = panelReference else { return }
@@ -605,7 +535,7 @@ final class WindowCoordinator {
             if Self.shouldCloseMainPanel(
                 clickedWindow: event.window,
                 mainPanel: panel,
-                settingsWindow: self.settingsWindow
+                homeWindow: self.homeWindow
             ) {
                 self.closeMainPanel()
             }
@@ -640,12 +570,11 @@ private final class MainPanel: NSPanel {
     override func sendEvent(_ event: NSEvent) {
         if event.type == .leftMouseDown,
            let editor = firstResponder as? NSTextView,
-           let control = editor.delegate as? NSView,
            let contentView {
             let point = contentView.convert(event.locationInWindow, from: nil)
             if let hitView = contentView.hitTest(point),
-               hitView !== control,
-               !hitView.isDescendant(of: control) {
+               hitView !== editor,
+               !hitView.isDescendant(of: editor) {
                 makeFirstResponder(nil)
             }
         }
@@ -657,6 +586,22 @@ private final class MainPanel: NSPanel {
         to screen: NSScreen?
     ) -> NSRect {
         frameRect
+    }
+}
+
+private final class HomeWindow: NSWindow {
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown,
+           let editor = firstResponder as? NSTextView,
+           let contentView {
+            let point = contentView.convert(event.locationInWindow, from: nil)
+            if let hitView = contentView.hitTest(point),
+               hitView !== editor,
+               !hitView.isDescendant(of: editor) {
+                makeFirstResponder(nil)
+            }
+        }
+        super.sendEvent(event)
     }
 }
 

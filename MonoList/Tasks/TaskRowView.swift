@@ -9,8 +9,6 @@ struct TaskRowView: View {
     let onMoveDown: () -> Void
     let onInsertAfter: () -> Void
     let onUpdateReminder: (TaskReminder?) -> Void
-    let onChangeGroup: () -> Void
-    let focusOrder: Int?
     let isSelected: Bool
     let onSelect: () -> Void
     let onEditingChanged: (Bool) -> Void
@@ -23,6 +21,7 @@ struct TaskRowView: View {
     let onIndent: (() -> Bool)?
     let onOutdent: (() -> Bool)?
     let subtaskProgressText: String?
+    let priorityRank: Int?
 
     @State private var text: String
     @State private var originalText: String
@@ -42,8 +41,6 @@ struct TaskRowView: View {
         onMoveDown: @escaping () -> Void,
         onInsertAfter: @escaping () -> Void,
         onUpdateReminder: @escaping (TaskReminder?) -> Void,
-        onChangeGroup: @escaping () -> Void,
-        focusOrder: Int? = nil,
         isSelected: Bool,
         onSelect: @escaping () -> Void,
         onEditingChanged: @escaping (Bool) -> Void,
@@ -55,7 +52,8 @@ struct TaskRowView: View {
         canAddSubtask: Bool = false,
         onIndent: (() -> Bool)? = nil,
         onOutdent: (() -> Bool)? = nil,
-        subtaskProgressText: String? = nil
+        subtaskProgressText: String? = nil,
+        priorityRank: Int? = nil
     ) {
         self.item = item
         self.onSave = onSave
@@ -65,8 +63,6 @@ struct TaskRowView: View {
         self.onMoveDown = onMoveDown
         self.onInsertAfter = onInsertAfter
         self.onUpdateReminder = onUpdateReminder
-        self.onChangeGroup = onChangeGroup
-        self.focusOrder = focusOrder
         self.isSelected = isSelected
         self.onSelect = onSelect
         self.onEditingChanged = onEditingChanged
@@ -79,6 +75,7 @@ struct TaskRowView: View {
         self.onIndent = onIndent
         self.onOutdent = onOutdent
         self.subtaskProgressText = subtaskProgressText
+        self.priorityRank = priorityRank
         _text = State(initialValue: item.text)
         _originalText = State(initialValue: item.text)
     }
@@ -87,28 +84,12 @@ struct TaskRowView: View {
         HStack(alignment: .center, spacing: 9) {
             hierarchyControl
 
-            if let focusOrder {
-                Button {
-                    beginCompletion()
-                } label: {
-                    Text("\(focusOrder)")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 19, height: 19)
-                        .background(Color.primary, in: Circle())
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.plain)
-                .disabled(isCompleting)
-                .help("标记为完成")
-            } else {
-                TaskCompletionButton(
-                    symbolSize: 18,
-                    frameSize: 28,
-                    isCompleting: isCompleting,
-                    action: beginCompletion
-                )
-            }
+            TaskCompletionButton(
+                symbolSize: 18,
+                frameSize: 28,
+                isCompleting: isCompleting,
+                action: beginCompletion
+            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Group {
@@ -116,6 +97,8 @@ struct TaskRowView: View {
                         TaskTextEditor(
                             text: $text,
                             isFocused: $isEditorFocused,
+                            fontSize: textFontSize,
+                            fontWeight: editorFontWeight,
                             onSubmit: {
                                 finishEditing()
                                 onInsertAfter()
@@ -130,6 +113,7 @@ struct TaskRowView: View {
                             }
                     } else {
                         Text(text)
+                            .font(.system(size: textFontSize, weight: textFontWeight))
                             .strikethrough(isCompleting)
                             .foregroundStyle(isCompleting ? .secondary : .primary)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -236,8 +220,6 @@ struct TaskRowView: View {
                 }
             }
             Divider()
-            Button(item.group == .shortTerm ? "移至长期任务" : "移至短期任务",
-                   action: onChangeGroup)
             Button("上移", action: onMoveUp)
             Button("下移", action: onMoveDown)
             Divider()
@@ -319,6 +301,31 @@ struct TaskRowView: View {
             return "\(date.formatted(.dateTime.month().day())) \(Self.timeTitle(for: date))"
         case .daily:
             return "每天 \(Self.timeTitle(minuteOfDay: reminder.minuteOfDay))"
+        }
+    }
+
+    private var textFontSize: CGFloat {
+        switch priorityRank {
+        case 0: return 18
+        case 1: return 16
+        case 2: return 14
+        default: return 13
+        }
+    }
+
+    private var textFontWeight: Font.Weight {
+        switch priorityRank {
+        case 0: return .semibold
+        case 1: return .medium
+        default: return .regular
+        }
+    }
+
+    private var editorFontWeight: NSFont.Weight {
+        switch priorityRank {
+        case 0: return .semibold
+        case 1: return .medium
+        default: return .regular
         }
     }
 
