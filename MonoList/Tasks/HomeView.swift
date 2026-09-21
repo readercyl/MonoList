@@ -163,17 +163,20 @@ struct HomeView: View {
 
             Divider().opacity(0.45)
 
-            SettingsView(
-                settings: settings,
-                taskStore: store,
-                reminderScheduler: reminderScheduler,
-                loginItemController: loginItemController,
-                updater: updater,
-                onInstallUpdate: onInstallUpdate,
-                onTestReminder: onTestReminder
-            )
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            ScrollView(.vertical) {
+                SettingsView(
+                    settings: settings,
+                    taskStore: store,
+                    reminderScheduler: reminderScheduler,
+                    loginItemController: loginItemController,
+                    updater: updater,
+                    onInstallUpdate: onInstallUpdate,
+                    onTestReminder: onTestReminder
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            }
+            .scrollBounceBehavior(.always, axes: .vertical)
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .frame(maxWidth: .infinity, alignment: .top)

@@ -78,6 +78,11 @@ if ! grep -q 'SettingsView(' "$HOME_VIEW" ||
   exit 1
 fi
 
+if ! grep -q 'scrollBounceBehavior(.always, axes: .vertical)' "$HOME_VIEW"; then
+  echo "设置页内容不足一屏时仍应保留轻微纵向回弹。" >&2
+  exit 1
+fi
+
 if ! grep -q 'homeWindow: self.homeWindow' "$WINDOW_COORDINATOR"; then
   echo "菜单栏浮窗外点判断必须覆盖主页窗口。" >&2
   exit 1
