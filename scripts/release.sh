@@ -34,24 +34,15 @@ if git rev-parse "$VERSION" >/dev/null 2>&1; then
   exit 1
 fi
 
-bash scripts/check-task-store.sh
-bash scripts/check-task-drop-coordinator.sh
-bash scripts/check-app-settings.sh
-bash scripts/check-ui-source-style.sh
-bash scripts/check-reminder-scheduler.sh
-bash scripts/check-menu-bar-bridge.sh
-bash scripts/check-window-coordinator.sh
-bash scripts/check-project-integrity.sh
-bash scripts/check-app-updater.sh
-bash scripts/check-update-installer.sh
+# These checks compile independent smoke binaries. Run them together and let
+# each check own its output, so one slow compile does not block all others.
+bash scripts/check-release-preflight.sh
 MONOLIST_APP_VERSION="$VERSION" bash scripts/package-dmg.sh >/dev/null
 bash scripts/check-app-launch.sh \
   build/local/MonoList.app \
   com.qingcheng.monolist.mac \
   com.qingcheng.monolist.menubar.v2 \
   MonoList
-bash scripts/check-release-signature.sh
-bash scripts/check-dmg-layout.sh "$DMG_PATH"
 
 if [[ "$MODE" == "--dry-run" ]]; then
   bash scripts/cleanup-build.sh
