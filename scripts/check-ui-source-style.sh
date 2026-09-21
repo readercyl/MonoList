@@ -53,6 +53,12 @@ if grep -q 'systemName: "xmark"' "$TASK_LIST"; then
   exit 1
 fi
 
+if ! grep -q 'visibleCompletedTasks' "$TASK_LIST" ||
+   ! grep -q 'onChange(of: showsOlderCompleted)' "$TASK_LIST"; then
+  echo "浮窗隐藏历史记录后必须按可见内容重新计算窗口高度。" >&2
+  exit 1
+fi
+
 if ! grep -q '声音类型' "$SETTINGS" ||
    [[ "$(grep -c 'reminderSoundEnabled' "$SETTINGS")" -lt 2 ]]; then
   echo "提醒开关和声音开关必须拆分，声音类型单独选择。" >&2

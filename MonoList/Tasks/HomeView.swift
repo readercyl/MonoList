@@ -23,7 +23,6 @@ struct HomeView: View {
     let onInstallUpdate: (AppUpdate) -> Void
     let onTestReminder: () -> Void
     let onWindowReady: () -> Void
-    let onSettingsSizeChanged: () -> Void
 
     @StateObject private var draftState = TaskDraftState()
     @State private var currentDate = Date()
@@ -177,11 +176,7 @@ struct HomeView: View {
             .padding(.vertical, 8)
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear {
-            DispatchQueue.main.async {
-                onSettingsSizeChanged()
-            }
-        }
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 
     private var toolbar: some View {

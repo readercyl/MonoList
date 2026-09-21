@@ -5,8 +5,8 @@ import SwiftUI
 final class WindowCoordinator {
     static let mainPanelWidth: CGFloat = 336
     static let mainPanelMinimumHeight: CGFloat = 106
-    static let mainPanelMaximumHeight: CGFloat = 447
-    static let homeWindowDefaultSize = NSSize(width: 430, height: 760)
+    static let mainPanelMaximumHeight: CGFloat = 560
+    static let homeWindowDefaultSize = NSSize(width: 430, height: 720)
     static let homeWindowMinimumSize = NSSize(width: 380, height: 520)
     static let homeWindowAutosaveName = "MonoList.HomeWindow"
 
@@ -299,9 +299,6 @@ final class WindowCoordinator {
         }
 
         if let homeWindow {
-            if showSettings {
-                fitHomeWindowToSettings()
-            }
             NSApp.activate(ignoringOtherApps: true)
             homeWindow.makeKeyAndOrderFront(nil)
             return
@@ -339,9 +336,6 @@ final class WindowCoordinator {
                             height: Self.homeWindowMinimumSize.height + 32
                         )
                     }
-                },
-                onSettingsSizeChanged: { [weak self] in
-                    self?.fitHomeWindowToSettings()
                 }
             )
         )
@@ -379,23 +373,6 @@ final class WindowCoordinator {
             window?.minSize = NSSize(
                 width: Self.homeWindowMinimumSize.width,
                 height: Self.homeWindowMinimumSize.height + 32
-            )
-        }
-    }
-
-    private func fitHomeWindowToSettings() {
-        guard let homeWindow,
-              let contentView = homeWindow.contentView else {
-            return
-        }
-        DispatchQueue.main.async {
-            contentView.layoutSubtreeIfNeeded()
-            let fittingSize = contentView.fittingSize
-            homeWindow.setContentSize(
-                NSSize(
-                    width: max(Self.homeWindowDefaultSize.width, ceil(fittingSize.width)),
-                    height: max(Self.homeWindowDefaultSize.height, ceil(fittingSize.height))
-                )
             )
         }
     }

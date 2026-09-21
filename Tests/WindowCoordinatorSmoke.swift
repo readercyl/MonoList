@@ -13,9 +13,9 @@ struct WindowCoordinatorSmoke {
         let coordinator = WindowCoordinator(taskStore: store)
 
         precondition(WindowCoordinator.mainPanelWidth == 336)
-        precondition(WindowCoordinator.mainPanelMaximumHeight == 447)
+        precondition(WindowCoordinator.mainPanelMaximumHeight == 560)
         precondition(WindowCoordinator.homeWindowDefaultSize.width == 430)
-        precondition(WindowCoordinator.homeWindowDefaultSize.height == 760)
+        precondition(WindowCoordinator.homeWindowDefaultSize.height == 720)
         precondition(WindowCoordinator.homeWindowMinimumSize.width == 380)
 
         let panelWindow = NSPanel()
@@ -59,7 +59,7 @@ struct WindowCoordinatorSmoke {
 
         precondition(
             TaskListView.contentHeight(
-                rowCount: 9,
+                rowCount: 13,
                 additionalLineCount: 2,
                 dateHeaderCount: 1
             ) > WindowCoordinator.mainPanelMaximumHeight
