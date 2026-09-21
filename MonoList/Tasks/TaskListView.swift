@@ -40,6 +40,14 @@ struct TaskListView: View {
         showsOlderCompleted ? olderCompletedGroups.reduce(0) { $0 + $1.tasks.count } : 0
     }
 
+    private var visiblePendingRowCount: Int {
+        store.topLevelPendingTasks.reduce(0) { count, root in
+            count + 1 + (
+                collapsedTaskIDs.contains(root.id) ? 0 : store.children(of: root.id).count
+            )
+        }
+    }
+
     private var naturalHeight: CGFloat {
         let visibleCompleted = todayCompletedRoots.count + visibleOlderCount
         let rows = store.pendingTasks.count + visibleCompleted + (draftState.isPresented ? 1 : 0)
@@ -58,7 +66,10 @@ struct TaskListView: View {
         let measuredHeight = measuredTaskContentHeight > 0
             ? measuredTaskContentHeight + 53
             : 0
-        return max(estimatedHeight, measuredHeight)
+        let minimumPendingHeight = visiblePendingRowCount > 0
+            ? 150 + CGFloat(visiblePendingRowCount * 68)
+            : 0
+        return max(estimatedHeight, measuredHeight, minimumPendingHeight)
     }
 
     private var preferredHeight: CGFloat {
@@ -104,6 +115,11 @@ struct TaskListView: View {
         }
         .onChange(of: preferredHeight) { _, height in
             onHeightChanged(height)
+        }
+        .onChange(of: measuredTaskContentHeight) { _, _ in
+            DispatchQueue.main.async {
+                onHeightChanged(preferredHeight)
+            }
         }
         .onChange(of: showsOlderCompleted) { _, _ in
             DispatchQueue.main.async {
@@ -245,6 +261,7 @@ struct TaskListView: View {
             .padding(.horizontal, 7)
             .padding(.vertical, 7)
             .frame(maxWidth: .infinity, alignment: .topLeading)
+            .fixedSize(horizontal: false, vertical: true)
             .background {
                 GeometryReader { geometry in
                     Color.clear.preference(
