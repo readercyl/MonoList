@@ -125,23 +125,19 @@ struct HomeView: View {
                         Color.clear
                             .frame(height: 1)
                             .id("home-scroll-top")
+                        HomeScrollViewObserver { offset in
+                            let shouldShow = offset > 160
+                            guard shouldShow != showsScrollToTop else { return }
+                            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
+                                showsScrollToTop = shouldShow
+                            }
+                        }
+                        .frame(width: 0, height: 0)
                         taskList
                             .onTapGesture {
                                 clearInteraction()
                             }
                     }
-                    .background {
-                        GeometryReader { geometry in
-                            Color.clear.preference(
-                                key: HomeScrollOffsetPreferenceKey.self,
-                                value: geometry.frame(in: .named("home-scroll")).minY
-                            )
-                        }
-                    }
-                }
-                .coordinateSpace(name: "home-scroll")
-                .onPreferenceChange(HomeScrollOffsetPreferenceKey.self) { minY in
-                    showsScrollToTop = minY < -160
                 }
                 .onChange(of: draftRequestID) { _, _ in
                     DispatchQueue.main.async {
@@ -1006,11 +1002,88 @@ private struct WindowDragArea: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
-private struct HomeScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+private struct HomeScrollViewObserver: NSViewRepresentable {
+    let onScroll: (CGFloat) -> Void
 
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+    func makeNSView(context: Context) -> HomeScrollObserverNSView {
+        HomeScrollObserverNSView(onScroll: onScroll)
+    }
+
+    func updateNSView(_ nsView: HomeScrollObserverNSView, context: Context) {
+        nsView.onScroll = onScroll
+        nsView.attachIfNeeded()
+    }
+}
+
+private final class HomeScrollObserverNSView: NSView {
+    var onScroll: (CGFloat) -> Void
+    private weak var scrollView: NSScrollView?
+    private var boundsObserver: NSObjectProtocol?
+
+    init(onScroll: @escaping (CGFloat) -> Void) {
+        self.onScroll = onScroll
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) {
+        return nil
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        attachIfNeeded()
+    }
+
+    override func layout() {
+        super.layout()
+        attachIfNeeded()
+    }
+
+    func attachIfNeeded() {
+        guard let scrollView = ancestorScrollView else { return }
+        if self.scrollView === scrollView {
+            reportOffset()
+            return
+        }
+        detach()
+        self.scrollView = scrollView
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        boundsObserver = NotificationCenter.default.addObserver(
+            forName: NSView.boundsDidChangeNotification,
+            object: scrollView.contentView,
+            queue: .main
+        ) { [weak self] _ in
+            self?.reportOffset()
+        }
+        reportOffset()
+    }
+
+    private var ancestorScrollView: NSScrollView? {
+        var candidate = superview
+        while let view = candidate {
+            if let scrollView = view as? NSScrollView {
+                return scrollView
+            }
+            candidate = view.superview
+        }
+        return nil
+    }
+
+    private func reportOffset() {
+        guard let scrollView else { return }
+        onScroll(max(0, scrollView.contentView.bounds.origin.y))
+    }
+
+    private func detach() {
+        if let boundsObserver {
+            NotificationCenter.default.removeObserver(boundsObserver)
+            self.boundsObserver = nil
+        }
+        scrollView = nil
+    }
+
+    deinit {
+        detach()
     }
 }
 

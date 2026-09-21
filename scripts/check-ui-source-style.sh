@@ -83,7 +83,7 @@ if ! grep -q 'scrollBounceBehavior(.always, axes: .vertical)' "$HOME_VIEW"; then
   exit 1
 fi
 
-if ! grep -q 'HomeScrollOffsetPreferenceKey' "$HOME_VIEW" ||
+if ! grep -q 'HomeScrollViewObserver' "$HOME_VIEW" ||
    ! grep -q 'home-scroll-top' "$HOME_VIEW" ||
    ! grep -q 'arrow.up' "$HOME_VIEW"; then
   echo "主页下滑后必须提供回到顶部的圆形向上按钮。" >&2
