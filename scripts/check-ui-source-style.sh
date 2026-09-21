@@ -16,6 +16,13 @@ for source in "$TASK_LIST" "$HOME_VIEW" "$TASK_ROW" "$WINDOW_COORDINATOR"; do
   fi
 done
 
+for source in "$TASK_LIST" "$HOME_VIEW" "$TASK_ROW"; do
+  if grep -q 'chevron.right' "$source"; then
+    echo "一级任务展开不能再使用左侧箭头：$source" >&2
+    exit 1
+  fi
+done
+
 if ! grep -q 'priorityRank' "$TASK_ROW" ||
    ! grep -q 'case 0: return 18' "$TASK_ROW" ||
    ! grep -q 'case 1: return 16' "$TASK_ROW" ||

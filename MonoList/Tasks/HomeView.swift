@@ -776,16 +776,7 @@ private struct HomeCompletedTaskRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 9) {
-            if hasSubtasks {
-                Button(action: onToggleSubtasks) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                        .frame(width: 20, height: 28)
-                }
-                .buttonStyle(.plain)
-            } else if indentationLevel > 0 {
+            if indentationLevel > 0 {
                 Color.clear.frame(width: 20, height: 28)
             }
 
@@ -804,6 +795,12 @@ private struct HomeCompletedTaskRow: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 5)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if hasSubtasks {
+                        onToggleSubtasks()
+                    }
+                }
 
             Button(action: onDelete) {
                 Image(systemName: "trash")

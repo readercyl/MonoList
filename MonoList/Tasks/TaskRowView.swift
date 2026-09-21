@@ -134,6 +134,17 @@ struct TaskRowView: View {
             }
             .padding(.vertical, 5)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    guard !isEditingMode else { return }
+                    if hasSubtasks {
+                        onToggleSubtasks()
+                    } else {
+                        onSelect()
+                    }
+                }
+            )
             .opacity(isCompleting ? 0.66 : 1)
             .animation(
                 reduceMotion ? nil : .easeOut(duration: 0.16),
@@ -180,14 +191,6 @@ struct TaskRowView: View {
             value: isSelected
         )
         .contentShape(Rectangle())
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                // Let NSTextView keep the click when this row is editing so
-                // the user can place or extend the insertion point.
-                guard !isEditingMode else { return }
-                onSelect()
-            }
-        )
         .onHover { isHovered = $0 }
         .animation(
             reduceMotion ? nil : .easeOut(duration: 0.16),
@@ -241,25 +244,10 @@ struct TaskRowView: View {
     }
 
     private var hierarchyControl: some View {
-        Group {
-            if hasSubtasks {
-                Button(action: onToggleSubtasks) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                        .frame(width: 20, height: 28)
-                }
-                .buttonStyle(.plain)
-                .help(isExpanded ? "隐藏子任务" : "展开子任务")
-                .accessibilityLabel(isExpanded ? "隐藏子任务" : "展开子任务")
-            } else {
-                Color.clear.frame(
-                    width: indentationLevel == 0 ? 0 : 20,
-                    height: 28
-                )
-            }
-        }
+        Color.clear.frame(
+            width: indentationLevel == 0 ? 0 : 20,
+            height: 28
+        )
     }
 
     @ViewBuilder
