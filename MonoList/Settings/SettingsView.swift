@@ -88,6 +88,10 @@ struct SettingsView: View {
             }
             .frame(height: 58)
             Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 58)
+        .overlay(alignment: .topTrailing) {
             Button(action: onBack) {
                 Label("返回", systemImage: "chevron.left")
                     .font(.system(size: 13))
@@ -101,10 +105,8 @@ struct SettingsView: View {
             .buttonStyle(.plain)
             .frame(width: 64, height: 40)
             .contentShape(Rectangle())
-            .offset(y: -14)
             .help("返回待办")
         }
-        .frame(height: 58)
     }
 
     private var reminderSettings: some View {
