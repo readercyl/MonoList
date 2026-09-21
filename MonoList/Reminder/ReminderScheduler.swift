@@ -293,7 +293,7 @@ final class ReminderScheduler: ObservableObject {
                     }
                     return lhs.id.uuidString < rhs.id.uuidString
                 })
-                .prefix(3)
+                .prefix(1)
         )
     }
 

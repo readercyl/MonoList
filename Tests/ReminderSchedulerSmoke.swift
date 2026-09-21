@@ -23,14 +23,14 @@ struct ReminderSchedulerSmoke {
         let lightTasks = ReminderScheduler.lightReminderTasks(
             in: Array(tasks.prefix(3)) + [reminderTask]
         )
-        precondition(lightTasks.map(\.text) == ["待办 0", "待办 1", "待办 2"])
+        precondition(lightTasks.map(\.text) == ["待办 0"])
 
         var laterTask = tasks[4]
         laterTask.reminder = .daily(minuteOfDay: 10 * 60)
         let filtered = ReminderScheduler.lightReminderTasks(
             in: tasks + [laterTask]
         )
-        precondition(filtered.count == 3)
+        precondition(filtered.count == 1)
         precondition(ReminderPanelController.tasksForTest([]).count == 1)
         precondition(
             ReminderPanelController.tasksForTest([])[0].text == "这是一次轻提醒测试"
@@ -42,15 +42,15 @@ struct ReminderSchedulerSmoke {
             rootView: ReminderView(
                 title: "待办提醒",
                 totalCount: 2,
-                taskTexts: ["整理任务", "完成验证"],
+                taskTexts: ["整理任务"],
                 model: ReminderPresentationModel(),
                 onOpen: {},
                 onClose: {}
             )
         )
-        view.frame = NSRect(x: 0, y: 0, width: 340, height: 300)
+        view.frame = NSRect(x: 0, y: 0, width: 420, height: 300)
         view.layoutSubtreeIfNeeded()
-        precondition(view.fittingSize.width == 340)
+        precondition(view.fittingSize.width == 420)
 
         var playedSounds: [String] = []
         let controller = ReminderPanelController { name in

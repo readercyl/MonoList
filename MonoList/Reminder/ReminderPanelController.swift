@@ -84,7 +84,7 @@ final class ReminderPanelController: ObservableObject {
             return
         }
 
-        let snapshot = Array(tasks.prefix(3))
+        let snapshot = Array(tasks.prefix(1))
         let model = ReminderPresentationModel()
         let hostingView = NSHostingView(
             rootView: ReminderView(
@@ -101,7 +101,7 @@ final class ReminderPanelController: ObservableObject {
                 }
             )
         )
-        let panelWidth: CGFloat = 340
+        let panelWidth: CGFloat = 420
         hostingView.frame = NSRect(x: 0, y: 0, width: panelWidth, height: 0)
         hostingView.layoutSubtreeIfNeeded()
         let contentHeight = ceil(hostingView.fittingSize.height)

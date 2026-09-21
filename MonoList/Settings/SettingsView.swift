@@ -104,7 +104,7 @@ struct SettingsView: View {
                 .labelsHidden()
                 .toggleStyle(SettingsSwitchStyle())
             }
-            Text("轻提醒按待办顺序提示前 3 条没有单独提醒的任务。")
+            Text("轻提醒按待办顺序提示第一条没有单独提醒的任务。")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -8,7 +8,7 @@ struct TaskListView: View {
     let onOpenHome: () -> Void
     let onHeightChanged: (CGFloat) -> Void
 
-    @State private var showsOlderCompleted = true
+    @State private var showsOlderCompleted = false
     @State private var errorMessage: String?
     @State private var selectedTaskID: UUID?
     @State private var editingTaskID: UUID?

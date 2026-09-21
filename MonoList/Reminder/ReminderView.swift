@@ -42,7 +42,9 @@ struct ReminderView: View {
                                 .frame(width: 5, height: 5)
                                 .padding(.top, 7)
                             Text(text)
-                                .lineLimit(2)
+                                .font(.system(size: 18, weight: .semibold))
+                                .lineSpacing(2)
+                                .lineLimit(3)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
@@ -57,7 +59,7 @@ struct ReminderView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .frame(width: 340, alignment: .leading)
+        .frame(width: 420, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
         .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
     }
