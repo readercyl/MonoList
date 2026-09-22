@@ -41,7 +41,9 @@ hdiutil create \
   -ov \
   -format UDZO \
   "$DMG_PATH" >/dev/null
-hdiutil verify "$DMG_PATH" >/dev/null
 xattr -cr "$DMG_PATH" 2>/dev/null || true
+# This is the single final-package gate: it verifies the disk image, mounts it
+# read-only, and checks the actual payload layout.
+"$ROOT_DIR/scripts/check-dmg-layout.sh" "$DMG_PATH"
 
 echo "$DMG_PATH"

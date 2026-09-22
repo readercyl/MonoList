@@ -39,22 +39,14 @@ build/
 ## 验证
 
 ```bash
-bash scripts/check-task-store.sh
-bash scripts/check-task-drop-coordinator.sh
-bash scripts/check-app-settings.sh
-bash scripts/check-ui-source-style.sh
-bash scripts/check-reminder-scheduler.sh
-bash scripts/check-menu-bar-bridge.sh
-bash scripts/check-window-coordinator.sh
-bash scripts/check-project-integrity.sh
-bash scripts/check-app-updater.sh
-bash scripts/check-update-installer.sh
+bash scripts/check-release-preflight.sh
 bash scripts/build-local.sh
 bash scripts/check-app-launch.sh
 ```
 
-`release.sh` 会在创建 tag 和 GitHub Release 前重复运行这些检查，并验证最终
-App 的签名和 DMG 布局。
+`check-release-preflight.sh` 会并行运行独立的源码与 Smoke 检查，并在失败时汇总
+对应日志。`release.sh` 会在创建 tag 和 GitHub Release 前调用它；正式打包脚本
+负责发布 App 的签名检查和最终 DMG 的校验，避免同一资产重复验证。
 
 ## 功能
 
