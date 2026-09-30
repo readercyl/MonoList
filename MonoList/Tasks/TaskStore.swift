@@ -49,6 +49,18 @@ final class TaskStore: ObservableObject {
             .sorted(by: Self.taskOrder)
     }
 
+    nonisolated static func pendingActionCount(in tasks: [TaskItem]) -> Int {
+        let parentIDs = Set(tasks.compactMap(\.parentID))
+        return tasks.filter { $0.status == .pending && !parentIDs.contains($0.id) }.count
+    }
+
+    var completedDisplayTasks: [TaskItem] {
+        let completedIDs = Set(historyTasks.map(\.id))
+        return historyTasks.filter { item in
+            item.parentID.map { !completedIDs.contains($0) } ?? true
+        }
+    }
+
     var shortTermTasks: [TaskItem] {
         pendingTasks.filter { $0.group == .shortTerm }
     }
@@ -288,6 +300,13 @@ final class TaskStore: ObservableObject {
             candidate[index].status = .history
             candidate[index].updatedAt = date
             candidate[index].completedAt = date
+        }
+        if let parentID = item.parentID,
+           !candidate.contains(where: { $0.parentID == parentID && $0.status == .pending }),
+           let parentIndex = candidate.firstIndex(where: { $0.id == parentID && $0.status == .pending }) {
+            candidate[parentIndex].status = .history
+            candidate[parentIndex].updatedAt = date
+            candidate[parentIndex].completedAt = date
         }
         normalizePendingOrders(in: &candidate)
         try commit(candidate)

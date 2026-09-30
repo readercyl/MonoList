@@ -39,13 +39,17 @@ struct HomeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var todayCompletedRoots: [TaskItem] {
-        store.completedTasks(on: currentDate).filter { $0.parentID == nil }
+        store.completedDisplayTasks.filter {
+            Calendar.current.isDate($0.completedAt ?? $0.updatedAt, inSameDayAs: currentDate)
+        }
     }
 
     private var olderCompletedGroups: [HomeCompletedGroup] {
         let calendar = Calendar.current
         let grouped = Dictionary(
-            grouping: store.completedTasks(before: currentDate).filter { $0.parentID == nil }
+            grouping: store.completedDisplayTasks.filter {
+                ($0.completedAt ?? $0.updatedAt) < calendar.startOfDay(for: currentDate)
+            }
         ) { calendar.startOfDay(for: $0.completedAt ?? $0.updatedAt) }
         return grouped
             .map { HomeCompletedGroup(date: $0.key, tasks: $0.value) }
@@ -307,7 +311,7 @@ struct HomeView: View {
 
     @ViewBuilder
     private func taskTree(for root: TaskItem, priorityRank: Int?) -> some View {
-        let children = store.children(of: root.id)
+        let children = store.children(of: root.id).filter { $0.status == .pending }
         VStack(alignment: .leading, spacing: 1) {
             pendingTaskRow(
                 root,
@@ -332,13 +336,6 @@ struct HomeView: View {
                             dropLowerBeforeID: children.indices.contains(index + 1)
                                 ? children[index + 1].id
                                 : nil
-                        )
-                    } else {
-                        HomeCompletedTaskRow(
-                            item: child,
-                            onRestore: { restoreTask(child) },
-                            onDelete: { deleteTask(child) },
-                            indentationLevel: 1
                         )
                     }
                     if draftState.isPresented,

@@ -438,7 +438,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private static func menuBarStatus(tasks: [TaskItem]) -> MenuBarStatus {
         MenuBarStatus(
-            pendingCount: tasks.filter { $0.status == .pending }.count
+            pendingCount: TaskStore.pendingActionCount(in: tasks)
         )
     }
 

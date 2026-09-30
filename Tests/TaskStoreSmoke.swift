@@ -24,6 +24,7 @@ struct TaskStoreSmoke {
         try testAddCompleteRestoreAndReload()
         try testEditAndMovePersist()
         try testNestedTasksAndCascadeRules()
+        try testSubtaskCompletionFailureAndRestore()
         try testCompleteCommitsPendingTextAtomically()
         try testExplicitReorderPersists()
         try testLegacyTasksDefaultToShortTerm()
@@ -115,7 +116,15 @@ struct TaskStoreSmoke {
         try require(store.historyTasks.map(\.id) == [firstChild.id],
                     "子任务单独完成没有进入已完成")
 
-        try store.complete(id: parent.id)
+        try require(TaskStore.pendingActionCount(in: store.tasks) == 1,
+                    "菜单栏应只计未完成子任务")
+        try require(store.completedDisplayTasks.map(\.id) == [firstChild.id],
+                    "已完成子任务应独立显示")
+        try store.complete(id: secondChild.id)
+        try require(store.completedDisplayTasks.map(\.id) == [parent.id],
+                    "子任务全部完成后应归组到父任务")
+        try require(TaskStore.pendingActionCount(in: store.tasks) == 0,
+                    "全部完成后菜单栏计数应为零")
         try require(store.pendingTasks.isEmpty,
                     "完成父任务后仍有未完成的子任务")
         try require(Set(store.historyTasks.map(\.id)) ==
@@ -452,6 +461,39 @@ struct TaskStoreSmoke {
         try store.clearAll()
         try require(store.pendingTasks.isEmpty && store.historyTasks.isEmpty,
                     "清空全部任务失败")
+    }
+
+    @MainActor
+    private static func testSubtaskCompletionFailureAndRestore() throws {
+        let fixture = try Fixture()
+        let store = TaskStore(fileURL: fixture.fileURL)
+        let parent = try store.add(text: "父任务")
+        let child = try store.add(text: "子任务", parentID: parent.id)
+        let standalone = try store.add(text: "独立任务")
+        try require(TaskStore.pendingActionCount(in: store.tasks) == 2,
+                    "父任务不能与子任务重复计数")
+        let original = try Data(contentsOf: fixture.fileURL)
+        let failing = TaskStore(fileURL: fixture.fileURL, writer: AlwaysFailWriter())
+        do {
+            try failing.complete(id: child.id)
+            throw TestFailure.failed("保存失败不应报告完成")
+        } catch is CocoaError {}
+        try require(failing.pendingTasks.count == 3 && failing.historyTasks.isEmpty,
+                    "保存失败应同时保留父子任务未完成状态")
+        try require(try Data(contentsOf: fixture.fileURL) == original,
+                    "保存失败不应改变任务文件")
+        try store.complete(id: child.id)
+        let reloaded = TaskStore(fileURL: fixture.fileURL)
+        try require(reloaded.completedDisplayTasks.map(\.id) == [parent.id],
+                    "自动完成与归组应在重启后保持")
+        try reloaded.restore(id: child.id)
+        try require(reloaded.completedDisplayTasks.isEmpty && reloaded.pendingTasks.count == 3,
+                    "恢复子任务应重新打开父任务")
+        try require(TaskStore.pendingActionCount(in: reloaded.tasks) == 2,
+                    "恢复子任务后计数错误")
+        try reloaded.complete(id: parent.id)
+        try require(reloaded.pendingTasks.map(\.id) == [standalone.id],
+                    "直接完成父任务应继续级联完成子任务")
     }
 
     @MainActor

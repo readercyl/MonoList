@@ -17,7 +17,7 @@ struct MenuBarBridgeSmoke {
         )
         precondition(
             appDelegateSource.contains("MenuBarStatus(") &&
-                appDelegateSource.contains("pendingCount: tasks.filter")
+                appDelegateSource.contains("pendingCount: TaskStore.pendingActionCount(in: tasks)")
         )
         precondition(!appDelegateSource.contains("focusTaskCount"))
         precondition(!appDelegateSource.contains("focusSelection"))
