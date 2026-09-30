@@ -8,6 +8,7 @@
 - 开发版必须使用独立显示名称 `MonoList 开发版`、独立 Bundle ID
   `com.qingcheng.monolist.dev` 和独立菜单栏服务 Bundle ID，不得复用正式版身份。
 - 开发版可以在开发完成后由青城点击测试，但不得复制到 `/Applications`，不得被当作正式版启动。
+- 每次正式发布完成并通过发布闭环验证后，清理本轮开发 App，先注销其 LaunchServices 登记，再移入废纸篓；不保留开发版候选，不删除任务、设置或提醒数据。等待测试的候选只保留到正式发布完成。
 - 正式打包必须显式使用 `MONOLIST_BUILD_FLAVOR=release`，生成正式 Bundle ID
   `com.qingcheng.monolist.mac` 和正式安装包。
 - 本地最多保留一个开发测试 App 和一个最新正式安装包；旧的可再生候选包在新候选确认后移入废纸篓或按用户要求清理。
