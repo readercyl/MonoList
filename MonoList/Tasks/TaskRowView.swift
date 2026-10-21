@@ -17,10 +17,6 @@ final class TaskExpansionState: ObservableObject {
     }
 }
 
-enum TaskRowLayout {
-    static let numberColumnWidth: CGFloat = 32
-}
-
 struct TaskRowView: View {
     let item: TaskItem
     let onSave: (String) -> Void
@@ -42,7 +38,6 @@ struct TaskRowView: View {
     let onIndent: (() -> Bool)?
     let onOutdent: (() -> Bool)?
     let subtaskCompletionStates: [Bool]
-    let sequenceNumber: Int?
 
     @State private var text: String
     @State private var originalText: String
@@ -73,8 +68,7 @@ struct TaskRowView: View {
         canAddSubtask: Bool = false,
         onIndent: (() -> Bool)? = nil,
         onOutdent: (() -> Bool)? = nil,
-        subtaskCompletionStates: [Bool] = [],
-        sequenceNumber: Int? = nil
+        subtaskCompletionStates: [Bool] = []
     ) {
         self.item = item
         self.onSave = onSave
@@ -96,7 +90,6 @@ struct TaskRowView: View {
         self.onIndent = onIndent
         self.onOutdent = onOutdent
         self.subtaskCompletionStates = subtaskCompletionStates
-        self.sequenceNumber = sequenceNumber
         _text = State(initialValue: item.text)
         _originalText = State(initialValue: item.text)
     }
@@ -134,17 +127,7 @@ struct TaskRowView: View {
                                 }
                             }
                     } else {
-                        HStack(alignment: .firstTextBaseline, spacing: 0) {
-                            if let sequenceNumber {
-                                Text("\(sequenceNumber)、 ")
-                                    .monospacedDigit()
-                                    .foregroundStyle(.secondary)
-                                    .fixedSize()
-                                    .frame(width: TaskRowLayout.numberColumnWidth, alignment: .leading)
-                            }
-                            Text(text)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                        Text(text)
                             .font(.system(size: textFontSize, weight: textFontWeight))
                             .strikethrough(isCompleting)
                             .foregroundStyle(isCompleting ? .secondary : .primary)
@@ -171,7 +154,6 @@ struct TaskRowView: View {
 
                 if !isEditingMode {
                     subtaskProgressLine
-                        .padding(.leading, sequenceNumber == nil ? 0 : TaskRowLayout.numberColumnWidth)
                     reminderStatusLine
                         .transition(.opacity)
                 }

@@ -405,8 +405,7 @@ struct TaskListView: View {
                     return true
                 }
             },
-            subtaskCompletionStates: store.children(of: item.id).map { $0.status == .history },
-            sequenceNumber: store.pendingSequenceNumber(for: item)
+            subtaskCompletionStates: store.children(of: item.id).map { $0.status == .history }
         )
         .background {
             GeometryReader { geometry in
@@ -921,9 +920,6 @@ private struct PanelCompletedTaskRow: View {
             .buttonStyle(.plain)
             .offset(y: -3)
             HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Color.clear
-                    .frame(width: TaskRowLayout.numberColumnWidth, height: 1)
-                    .accessibilityHidden(true)
                 Text(item.text)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)

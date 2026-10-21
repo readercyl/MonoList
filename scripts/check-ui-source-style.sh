@@ -24,8 +24,8 @@ fi
 
 if rg -q 'priorityRank' "$TASK_ROW" "$TASK_LIST" "$HOME_VIEW" ||
    ! rg -q 'textFontSize: CGFloat \{ hasSubtasks \? 15 : 14 \}' "$TASK_ROW" ||
-   ! rg -q 'HStack\(alignment: .firstTextBaseline, spacing: 0\)' "$TASK_ROW"; then
-  echo "父任务使用大一号字号，编号与正文首行对齐。" >&2
+   rg -q 'sequenceNumber|numberColumnWidth' "$TASK_ROW" "$TASK_LIST" "$HOME_VIEW"; then
+  echo "父任务使用大一号字号，任务不显示编号或编号占位。" >&2
   exit 1
 fi
 

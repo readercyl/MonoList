@@ -42,16 +42,9 @@ struct TaskDropCoordinatorSmoke {
             locationY: 45, rowHeight: 120
         )
         precondition(tallRowTarget.beforeID == second.id)
-        precondition(store.pendingSequenceNumber(for: second) == 1)
-        precondition(store.pendingSequenceNumber(for: first) == 2)
-        precondition(store.pendingSequenceNumber(for: child) == 1)
         let anotherChild = try store.add(text: "另一子任务", parentID: second.id)
-        precondition(store.pendingSequenceNumber(for: anotherChild) == 2)
         try store.complete(id: child.id)
-        precondition(store.pendingSequenceNumber(for: anotherChild) == 1)
         try store.restore(id: child.id)
-        precondition(store.children(of: second.id).filter { $0.status == .pending }
-            .enumerated().allSatisfy { store.pendingSequenceNumber(for: $0.element) == $0.offset + 1 })
         let upwardSession = coordinator.beginDragging(task: third)
         coordinator.hover(group: .shortTerm, before: second.id, sessionID: upwardSession)
         try coordinator.performDrop(sourceID: third.id, store: store)
@@ -66,10 +59,7 @@ struct TaskDropCoordinatorSmoke {
         coordinator.hover(group: .shortTerm, before: child.id,
                           parentID: second.id, sessionID: moveChildSession)
         try coordinator.performDrop(sourceID: anotherChild.id, store: store)
-        precondition(store.pendingSequenceNumber(for: anotherChild) == 1)
-        precondition(store.pendingSequenceNumber(for: child) == 2)
         try store.complete(id: third.id)
-        precondition(store.pendingSequenceNumber(for: first) == 2)
         let reloaded = TaskStore(fileURL: directory.appendingPathComponent("tasks.json"))
         precondition(reloaded.pendingTasks.map(\.id) == store.pendingTasks.map(\.id))
         precondition(reloaded.tasks.first { $0.id == first.id }?.text == "第一条")
