@@ -34,4 +34,11 @@ fi
   exit 1
 }
 
-echo "DMG layout check passed."
+CLI_LAUNCHER="$ROOT/MonoList.app/Contents/MacOS/monolist-cli"
+[[ -x "$CLI_LAUNCHER" ]] || {
+  echo "安装包中缺少可执行 CLI 入口" >&2
+  exit 1
+}
+"$CLI_LAUNCHER" help >/dev/null
+
+echo "DMG layout and bundled CLI check passed."

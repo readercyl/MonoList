@@ -280,7 +280,7 @@ struct SettingsView: View {
 
     private var agentConnectionSettings: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("复制说明发给智能体，再用自然语言管理任务。需要智能体支持运行本机命令，无需配置模型或密钥。")
+            Text("复制说明给支持本机命令的智能体。")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -301,9 +301,6 @@ struct SettingsView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("当前为" + (Bundle.main.bundleIdentifier == "com.qingcheng.monolist.dev" ? "开发版" : "正式版") + "；说明会自动使用本 App 的 CLI 路径。")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
         }
     }
 
