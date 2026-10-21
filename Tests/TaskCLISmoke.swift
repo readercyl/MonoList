@@ -10,6 +10,21 @@ private struct FailingCLIWriter: AtomicWriting {
 struct TaskCLISmoke {
     @MainActor
     static func main() throws {
+        let specialBundle = URL(fileURLWithPath: "/tmp/Mono List's $(printf unexpected).app")
+        let instructions = TaskCLI.agentInstructions(bundleURL: specialBundle,
+                                                     bundleID: "com.qingcheng.monolist.dev")
+        precondition(instructions.contains("MonoList 开发版"))
+        precondition(instructions.contains("monolist-cli"))
+        precondition(instructions.contains("confirm:true"))
+        let quotingTest = Process()
+        let quotingOutput = Pipe()
+        quotingTest.executableURL = URL(fileURLWithPath: "/bin/bash")
+        quotingTest.arguments = ["-c", "printf '%s' " + TaskCLI.shellQuote(specialBundle.path)]
+        quotingTest.standardOutput = quotingOutput
+        try quotingTest.run()
+        let quotedResult = quotingOutput.fileHandleForReading.readDataToEndOfFile()
+        quotingTest.waitUntilExit()
+        precondition(String(data: quotedResult, encoding: .utf8) == specialBundle.path)
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("MonoListCLI-\(UUID())")
         defer { try? FileManager.default.removeItem(at: directory) }
         let url = directory.appendingPathComponent("tasks.json")

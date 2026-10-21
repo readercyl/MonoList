@@ -91,6 +91,7 @@ MONOLIST_APP_VERSION=vX.Y.Z bash scripts/package-dmg.sh
 ## AI 智能体调用：CLI
 
 CLI 与界面通过同一个运行中的 MonoList 实例操作任务，不内置模型、API 密钥或对话框。
+设置中的“AI 智能体接入”提供复制接入说明、查看命令与示例、检测接口状态；复制内容自动使用当前 App 的路径与版本身份。用户可直接将说明粘贴给支持本机命令的智能体。
 先打开对应 App。开发候选在仓库中用 `/bin/bash scripts/monolist help` 查看命令；
 安装包内的入口是 `MonoList.app/Contents/MacOS/monolist-cli`，不用额外安装依赖或注册全局命令。
 正式版与开发版的 CLI 分别连接各自的 App；此功能尚需随版本发布才会进入正式版。

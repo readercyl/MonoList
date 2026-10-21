@@ -16,6 +16,11 @@ struct SettingsView: View {
 
     @State private var errorMessage: String?
     @State private var currentDate = Date()
+    @State private var showsCLICommands = false
+    @State private var copiedCLIInstructions = false
+    @State private var checkingCLI = false
+    @State private var cliStatus = "尚未检测"
+
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -25,6 +30,9 @@ struct SettingsView: View {
             }
             SettingsCard(title: "启动", systemImage: "power") {
                 startupSettings
+            }
+            SettingsCard(title: "AI 智能体接入", systemImage: "terminal") {
+                agentConnectionSettings
             }
         }
         .padding(16)
@@ -42,6 +50,31 @@ struct SettingsView: View {
             Button("好") { errorMessage = nil }
         } message: {
             Text(errorMessage ?? "")
+        }
+        .sheet(isPresented: $showsCLICommands) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("CLI 命令与示例").font(.headline)
+                    Spacer()
+                    Button("关闭") { showsCLICommands = false }
+                        .keyboardShortcut(.cancelAction)
+                }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("先打开 MonoList，再把接入说明粘贴给能运行本机命令的智能体。")
+                        Text(TaskCLI.agentInstructions(bundleURL: Bundle.main.bundleURL,
+                            bundleID: Bundle.main.bundleIdentifier ?? ""))
+                        Divider()
+                        Text(TaskCLI.help)
+                    }
+                    .font(.system(size: 12, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                Button("复制接入说明") { copyCLIInstructions() }
+            }
+            .padding(16)
+            .frame(width: 380, height: 440)
         }
         .onReceive(
             Timer.publish(every: 60, on: .main, in: .common).autoconnect()
@@ -244,6 +277,54 @@ struct SettingsView: View {
         "Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero",
         "Morse", "Ping", "Pop", "Purr", "Sosumi", "Submarine", "Tink",
     ].filter { NSSound(named: NSSound.Name($0)) != nil }
+
+    private var agentConnectionSettings: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("复制说明发给智能体，再用自然语言管理任务。需要智能体支持运行本机命令，无需配置模型或密钥。")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            settingsRow("接入说明") {
+                Button(copiedCLIInstructions ? "已复制" : "复制给智能体") { copyCLIInstructions() }
+                    .buttonStyle(FixedQuietButtonStyle(width: Self.controlWidth))
+            }
+            settingsRow("命令与示例") {
+                Button("查看说明") { showsCLICommands = true }
+                    .buttonStyle(FixedQuietButtonStyle(width: Self.controlWidth))
+            }
+            settingsRow("接口状态") {
+                Button(checkingCLI ? "检测中…" : "检测接口") { checkCLIConnection() }
+                    .buttonStyle(FixedQuietButtonStyle(width: Self.controlWidth))
+                    .disabled(checkingCLI)
+            }
+            Text(cliStatus)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("当前为" + (Bundle.main.bundleIdentifier == "com.qingcheng.monolist.dev" ? "开发版" : "正式版") + "；说明会自动使用本 App 的 CLI 路径。")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func copyCLIInstructions() {
+        NSPasteboard.general.clearContents()
+        copiedCLIInstructions = NSPasteboard.general.setString(
+            TaskCLI.agentInstructions(bundleURL: Bundle.main.bundleURL,
+                bundleID: Bundle.main.bundleIdentifier ?? ""), forType: .string)
+    }
+
+    private func checkCLIConnection() {
+        guard !checkingCLI else { return }
+        checkingCLI = true
+        let bundleID = Bundle.main.bundleIdentifier ?? ""
+        Task {
+            // The app services this request on its main run loop; never block that loop waiting for itself.
+            let status = await TaskCLI.connectionStatus(bundleURL: Bundle.main.bundleURL, bundleID: bundleID)
+            cliStatus = status
+            checkingCLI = false
+        }
+    }
 
     private var startupSettings: some View {
         VStack(spacing: 8) {

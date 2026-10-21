@@ -143,6 +143,22 @@ struct WindowCoordinatorSmoke {
         }!
         precondition(abs(reopenedPanel.frame.height - collapsedHeight) < 2)
         coordinator.closeMainPanel(animated: false)
+        let diagnosticBundle = directory.appendingPathComponent("Diagnostic.app")
+        let launcher = TaskCLI.launcherURL(in: diagnosticBundle)
+        try FileManager.default.createDirectory(at: launcher.deletingLastPathComponent(),
+                                               withIntermediateDirectories: true)
+        try Data("#!/bin/bash\nexit 0\n".utf8).write(to: launcher)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: launcher.path)
+        let diagnosticID = "com.monolist.test.\(UUID().uuidString)"
+        let diagnosticService = try TaskCLIService(name: TaskCLI.serviceName(bundleID: diagnosticID)) { _ in
+            Data("{\"ok\":true,\"result\":{\"development\":false,\"version\":\"test\"}}".utf8)
+        }
+        let diagnosticStatus = await TaskCLI.connectionStatus(bundleURL: diagnosticBundle, bundleID: diagnosticID)
+        precondition(diagnosticStatus.contains("接口可用") && diagnosticStatus.contains("正式版"))
+        withExtendedLifetime(diagnosticService) {}
+        let missingStatus = await TaskCLI.connectionStatus(
+            bundleURL: directory.appendingPathComponent("Missing.app"), bundleID: diagnosticID)
+        precondition(missingStatus.contains("缺少 CLI"))
         print("Window coordinator smoke passed.")
     }
 }

@@ -9,6 +9,7 @@ mkdir -p "$BUILD_DIR"
 
 swiftc \
   -parse-as-library \
+  "$ROOT_DIR/MonoList/App/TaskCLI.swift" \
   "$ROOT_DIR/MonoList/App/WindowCoordinator.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskItem.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskStore.swift" \
