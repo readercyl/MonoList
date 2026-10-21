@@ -16,18 +16,16 @@ for source in "$TASK_LIST" "$HOME_VIEW" "$TASK_ROW" "$WINDOW_COORDINATOR"; do
   fi
 done
 
-for source in "$TASK_LIST" "$HOME_VIEW" "$TASK_ROW"; do
-  if grep -q 'chevron.right' "$source"; then
-    echo "一级任务展开不能再使用左侧箭头：$source" >&2
-    exit 1
-  fi
-done
+if ! rg -q 'chevron.down.*chevron.right' "$TASK_ROW" ||
+   ! rg -q 'Button\(action: onToggleSubtasks\)' "$TASK_ROW"; then
+  echo "父任务进度旁必须提供展开与收起入口。" >&2
+  exit 1
+fi
 
-if ! grep -q 'priorityRank' "$TASK_ROW" ||
-   ! grep -q 'case 0: return 18' "$TASK_ROW" ||
-   ! grep -q 'case 1: return 16' "$TASK_ROW" ||
-   ! grep -q 'case 2: return 14' "$TASK_ROW"; then
-  echo "前三条待办必须使用从大到小的字号层级。" >&2
+if rg -q 'priorityRank' "$TASK_ROW" "$TASK_LIST" "$HOME_VIEW" ||
+   ! rg -q 'textFontSize: CGFloat \{ 14 \}' "$TASK_ROW" ||
+   ! rg -q 'HStack\(alignment: .firstTextBaseline, spacing: 0\)' "$TASK_ROW"; then
+  echo "同级待办字号必须统一，编号与正文首行对齐。" >&2
   exit 1
 fi
 

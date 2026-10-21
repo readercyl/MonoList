@@ -290,11 +290,8 @@ struct HomeView: View {
                     .padding(.vertical, 6)
             }
 
-            ForEach(Array(roots.enumerated()), id: \.element.id) { index, root in
-                taskTree(
-                    for: root,
-                    priorityRank: index < 3 ? index : nil
-                )
+            ForEach(roots) { root in
+                taskTree(for: root)
                 if draftState.isPresented,
                    draftState.parentID == nil,
                    draftState.afterID == root.id {
@@ -311,13 +308,12 @@ struct HomeView: View {
     }
 
     @ViewBuilder
-    private func taskTree(for root: TaskItem, priorityRank: Int?) -> some View {
+    private func taskTree(for root: TaskItem) -> some View {
         let children = store.children(of: root.id).filter { $0.status == .pending }
         VStack(alignment: .leading, spacing: 1) {
             pendingTaskRow(
                 root,
                 indentationLevel: 0,
-                priorityRank: priorityRank,
                 hasSubtasks: !children.isEmpty,
                 dropParentID: nil,
                 dropUpperBeforeID: root.id,
@@ -330,7 +326,6 @@ struct HomeView: View {
                         pendingTaskRow(
                             child,
                             indentationLevel: 1,
-                            priorityRank: nil,
                             hasSubtasks: false,
                             dropParentID: root.id,
                             dropUpperBeforeID: child.id,
@@ -356,7 +351,6 @@ struct HomeView: View {
     private func pendingTaskRow(
         _ item: TaskItem,
         indentationLevel: Int,
-        priorityRank: Int?,
         hasSubtasks: Bool,
         dropParentID: UUID?,
         dropUpperBeforeID: UUID?,
@@ -400,7 +394,6 @@ struct HomeView: View {
                 }
             },
             subtaskProgressText: store.subtaskProgressText(for: item.id),
-            priorityRank: priorityRank,
             sequenceNumber: store.pendingSequenceNumber(for: item)
         )
         .background {
@@ -435,7 +428,7 @@ struct HomeView: View {
             dropCoordinator.beginDragging(task: item)
             return NSItemProvider(object: item.id.uuidString as NSString)
         } preview: {
-            HomeTaskDragPreview(text: item.text, priorityRank: priorityRank)
+            HomeTaskDragPreview(text: item.text, hasSubtasks: hasSubtasks)
         }
         .onDrop(
             of: [UTType.text],
@@ -848,7 +841,7 @@ private struct HomeCompletedTaskRow: View {
 
 private struct HomeTaskDragPreview: View {
     let text: String
-    let priorityRank: Int?
+    let hasSubtasks: Bool
 
     var body: some View {
         HStack(spacing: 9) {
@@ -871,17 +864,10 @@ private struct HomeTaskDragPreview: View {
         .shadow(color: .black.opacity(0.14), radius: 6, y: 2)
     }
 
-    private var fontSize: CGFloat {
-        switch priorityRank {
-        case 0: return 18
-        case 1: return 16
-        case 2: return 14
-        default: return 13
-        }
-    }
+    private var fontSize: CGFloat { 14 }
 
     private var fontWeight: Font.Weight {
-        priorityRank == 0 ? .semibold : .regular
+        hasSubtasks ? .semibold : .regular
     }
 }
 

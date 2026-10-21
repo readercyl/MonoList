@@ -22,7 +22,6 @@ struct TaskRowView: View {
     let onOutdent: (() -> Bool)?
     let subtaskProgressText: String?
     let sequenceNumber: Int?
-    let priorityRank: Int?
 
     @State private var text: String
     @State private var originalText: String
@@ -54,7 +53,6 @@ struct TaskRowView: View {
         onIndent: (() -> Bool)? = nil,
         onOutdent: (() -> Bool)? = nil,
         subtaskProgressText: String? = nil,
-        priorityRank: Int? = nil,
         sequenceNumber: Int? = nil
     ) {
         self.item = item
@@ -78,13 +76,12 @@ struct TaskRowView: View {
         self.onOutdent = onOutdent
         self.subtaskProgressText = subtaskProgressText
         self.sequenceNumber = sequenceNumber
-        self.priorityRank = priorityRank
         _text = State(initialValue: item.text)
         _originalText = State(initialValue: item.text)
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 9) {
+        HStack(alignment: .top, spacing: 9) {
             hierarchyControl
 
             TaskCompletionButton(
@@ -93,15 +90,7 @@ struct TaskRowView: View {
                 isCompleting: isCompleting,
                 action: beginCompletion
             )
-
-            if let sequenceNumber {
-                Text("\(sequenceNumber)、")
-                    .font(.system(size: 12))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .fixedSize()
-                    .accessibilityLabel("第\(sequenceNumber)项")
-            }
+            .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 4) {
                 Group {
@@ -124,7 +113,16 @@ struct TaskRowView: View {
                                 }
                             }
                     } else {
-                        Text(text)
+                        HStack(alignment: .firstTextBaseline, spacing: 0) {
+                            if let sequenceNumber {
+                                Text("\(sequenceNumber)、")
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize()
+                            }
+                            Text(text)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                             .font(.system(size: textFontSize, weight: textFontWeight))
                             .strikethrough(isCompleting)
                             .foregroundStyle(isCompleting ? .secondary : .primary)
@@ -138,6 +136,17 @@ struct TaskRowView: View {
                             )
                     }
                 }
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        guard !isEditingMode else { return }
+                        if hasSubtasks {
+                            onToggleSubtasks()
+                        } else {
+                            onSelect()
+                        }
+                    }
+                )
+
                 if !isEditingMode {
                     subtaskProgressLine
                     reminderStatusLine
@@ -147,16 +156,6 @@ struct TaskRowView: View {
             .padding(.vertical, 5)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .simultaneousGesture(
-                TapGesture().onEnded {
-                    guard !isEditingMode else { return }
-                    if hasSubtasks {
-                        onToggleSubtasks()
-                    } else {
-                        onSelect()
-                    }
-                }
-            )
             .opacity(isCompleting ? 0.66 : 1)
             .animation(
                 reduceMotion ? nil : .easeOut(duration: 0.16),
@@ -265,12 +264,17 @@ struct TaskRowView: View {
     @ViewBuilder
     private var subtaskProgressLine: some View {
         if let subtaskProgressText {
-            HStack(spacing: 4) {
-                Image(systemName: "checklist")
-                    .font(.system(size: 10, weight: .medium))
-                Text(subtaskProgressText)
-                    .font(.system(size: 11, weight: .regular))
+            Button(action: onToggleSubtasks) {
+                HStack(spacing: 4) {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text(subtaskProgressText)
+                        .font(.system(size: 11, weight: .regular))
+                }
             }
+            .buttonStyle(.plain)
+            .help(isExpanded ? "收起子任务" : "展开子任务")
+            .accessibilityLabel(isExpanded ? "收起子任务，\(subtaskProgressText)" : "展开子任务，\(subtaskProgressText)")
             .foregroundStyle(.secondary)
             .transition(.opacity)
         }
@@ -304,29 +308,14 @@ struct TaskRowView: View {
         }
     }
 
-    private var textFontSize: CGFloat {
-        switch priorityRank {
-        case 0: return 18
-        case 1: return 16
-        case 2: return 14
-        default: return 13
-        }
-    }
+    private var textFontSize: CGFloat { 14 }
 
     private var textFontWeight: Font.Weight {
-        switch priorityRank {
-        case 0: return .semibold
-        case 1: return .medium
-        default: return .regular
-        }
+        hasSubtasks ? .semibold : .regular
     }
 
     private var editorFontWeight: NSFont.Weight {
-        switch priorityRank {
-        case 0: return .semibold
-        case 1: return .medium
-        default: return .regular
-        }
+        hasSubtasks ? .semibold : .regular
     }
 
     private func beginEditing() {
