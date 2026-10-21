@@ -284,6 +284,11 @@ final class WindowCoordinator {
         }
     }
 
+    func hideWindowsForCLI() {
+        closeMainPanel(animated: false)
+        homeWindow?.orderOut(nil)
+    }
+
     func showSettings() {
         showHome(showSettings: true)
     }

@@ -8,7 +8,10 @@ struct TaskListView: View {
     let onOpenHome: () -> Void
     let onHeightChanged: (CGFloat) -> Void
 
-    @State private var showsOlderCompleted = false
+    private var showsOlderCompleted: Bool {
+        get { expansionState.panelHistory }
+        nonmutating set { expansionState.panelHistory = newValue }
+    }
     @State private var errorMessage: String?
     @State private var selectedTaskID: UUID?
     @State private var editingTaskID: UUID?

@@ -1,10 +1,10 @@
 import AppKit
 import Combine
 
-@main
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private static var retainedDelegate: AppDelegate?
+    private var cliService: TaskCLIService?
     private var taskStore: TaskStore?
     private var windowCoordinator: WindowCoordinator?
     private var appSettings: AppSettings?
@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         isDevelopmentBuild ? "MonoList 开发版" : "MonoList"
     }
 
-    static func main() {
+    static func run() {
         let application = NSApplication.shared
         let delegate = AppDelegate()
         retainedDelegate = delegate
@@ -36,7 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let applicationSupportURL = FileManager.default.urls(
+        let isolatedPath = TaskCLI.isolatedDirectory(bundleID: Bundle.main.bundleIdentifier ?? "")
+        let applicationSupportURL = isolatedPath.map { URL(fileURLWithPath: $0) } ?? FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
         )[0].appendingPathComponent(applicationSupportDirectoryName)
@@ -50,7 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             isDevelopmentBuild: isDevelopmentBuild
         )
         if isDevelopmentBuild {
-            loginController.removeDevelopmentRegistration()
+            if isolatedPath == nil { loginController.removeDevelopmentRegistration() }
         } else if
             settings.launchAtLogin && loginController.status != .enabled {
             try? loginController.setEnabled(true)
@@ -84,6 +85,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         taskStore = store
+        do {
+            cliService = try TaskCLIService(name: TaskCLI.serviceName(
+                bundleID: Bundle.main.bundleIdentifier ?? "com.qingcheng.monolist.dev")) { [weak self] data in
+                MainActor.assumeIsolated {
+                    guard let self else { return TaskCLI.failure("app_unavailable") }
+                    return self.handleCLI(data)
+                }
+            }
+        } catch {
+            NSLog("MonoList CLI unavailable: %@", error.localizedDescription)
+        }
+
         appSettings = settings
         loginItemController = loginController
         self.reminderPanelController = reminderPanelController
@@ -91,9 +104,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.updateInstaller = updateInstaller
         windowCoordinator = coordinator
         installMenuBarObservers()
-        showHomeForInteractiveLaunch()
+        if isolatedPath == nil { showHomeForInteractiveLaunch() }
         let initialMenuBarStatus = Self.menuBarStatus(tasks: store.tasks)
-        launchMenuBarHelper(status: initialMenuBarStatus)
+        if isolatedPath == nil { launchMenuBarHelper(status: initialMenuBarStatus) }
         store.$tasks
             .map { tasks in Self.menuBarStatus(tasks: tasks) }
             .removeDuplicates()
@@ -166,6 +179,161 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+    }
+
+    private func handleCLI(_ data: Data) -> Data {
+        do {
+            guard let store = taskStore, let settings = appSettings,
+                  let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let command = object["command"] as? String else {
+                throw TaskCLIError.message("invalid_request")
+            }
+            func json<T: Encodable>(_ value: T) throws -> Any {
+                try JSONSerialization.jsonObject(with: TaskCLI.encode(value))
+            }
+            func confirmed() throws {
+                guard object["confirm"] as? Bool == true else {
+                    throw TaskCLIError.message("此操作需要 confirm:true")
+                }
+            }
+            let result: Any
+            switch command {
+            case "list": result = try json(store.cliSnapshot())
+            case "apply":
+                guard TaskExpansionState.shared.activeEditors.isEmpty else {
+                    throw TaskCLIError.message("editor_busy: 请先结束界面中的任务编辑")
+                }
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                result = try json(store.applyCLI(decoder.decode(TaskCLIBatch.self, from: data)))
+            case "status":
+                result = ["version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "",
+                          "development": isDevelopmentBuild,
+                          "pendingCount": store.pendingTasks.count,
+                          "menuBarCount": TaskStore.pendingActionCount(in: store.tasks),
+                          "nextReminderDate": reminderScheduler?.nextReminderDate.map {
+                              ISO8601DateFormatter().string(from: $0)
+                          } ?? "",
+                          "reminderVisible": reminderPanelController?.isVisible ?? false,
+                          "settingsVisible": windowCoordinator?.isSettingsVisible ?? false,
+                          "completedCount": store.historyTasks.count,
+                          "editorBusy": !TaskExpansionState.shared.activeEditors.isEmpty,
+                          "loadError": store.loadError?.localizedDescription ?? "",
+                          "writePaused": store.isWritePaused,
+                          "login": loginItemController?.statusText ?? "",
+                          "homeVisible": windowCoordinator?.isHomeVisible ?? false,
+                          "panelVisible": windowCoordinator?.isMainPanelVisible ?? false] as [String: Any]
+            case "settings.get":
+                result = ["revision": try TaskCLI.revision(settings.values),
+                          "values": try json(settings.values)]
+            case "settings.set":
+                guard object["expectedRevision"] as? String == (try TaskCLI.revision(settings.values)),
+                      let patch = object["values"] as? [String: Any], !patch.isEmpty else {
+                    throw TaskCLIError.message("settings_conflict_or_missing_values: 请先 settings.get")
+                }
+                let fields: Set<String> = ["reminderEnabled", "reminderIntervalMinutes",
+                    "reminderStartMinuteOfDay", "reminderEndMinuteOfDay", "reminderPosition",
+                    "reminderSoundEnabled", "reminderSoundName", "automaticUpdatesEnabled"]
+                guard Set(patch.keys).isSubset(of: fields), !patch.values.contains(where: { $0 is NSNull }) else {
+                    throw TaskCLIError.message("未知或只读设置；开机启动请用 login.set")
+                }
+                var merged = try json(settings.values) as! [String: Any]
+                merged.merge(patch) { _, new in new }
+                let candidate = try JSONDecoder().decode(SettingsValues.self,
+                    from: JSONSerialization.data(withJSONObject: merged))
+                guard [30, 60, 90, 120].contains(candidate.reminderIntervalMinutes),
+                      AppSettings.isValidReminderTimeRange(startMinuteOfDay: candidate.reminderStartMinuteOfDay,
+                        endMinuteOfDay: candidate.reminderEndMinuteOfDay),
+                      ReminderPosition.supportedCases.contains(candidate.reminderPosition),
+                      SettingsView.systemSoundNames.contains(candidate.reminderSoundName) else {
+                    throw TaskCLIError.message("设置值不在界面允许的范围内")
+                }
+                try settings.backupForCLI()
+                try settings.update { $0 = candidate }
+                result = ["revision": try TaskCLI.revision(settings.values), "values": try json(settings.values)]
+            case "login.set":
+                try confirmed()
+                guard let enabled = object["enabled"] as? Bool, let controller = loginItemController else {
+                    throw TaskCLIError.message("缺少 enabled")
+                }
+                guard !isDevelopmentBuild else { throw LoginItemControllerError.developmentBuildReadOnly }
+                let previous = settings.launchAtLogin
+                try settings.backupForCLI()
+                try controller.setEnabled(enabled)
+                do { try settings.update { $0.launchAtLogin = enabled } }
+                catch {
+                    do { try controller.setEnabled(previous) }
+                    catch { throw TaskCLIError.message("设置保存和启动项恢复均失败，请在系统设置检查启动项") }
+                    throw error
+                }
+                result = ["status": controller.statusText]
+            case "view.get":
+                let state = TaskExpansionState.shared
+                result = ["collapsedIDs": state.collapsedTaskIDs.map(\.uuidString).sorted(),
+                          "homeHistory": state.homeHistory, "panelHistory": state.panelHistory] as [String: Any]
+            case "view.set":
+                let state = TaskExpansionState.shared
+                let fields: Set<String> = ["collapsedIDs", "homeHistory", "panelHistory"]
+                let supplied = Set(object.keys).subtracting(["command"])
+                guard !supplied.isEmpty, supplied.isSubset(of: fields) else {
+                    throw TaskCLIError.message("view.set 需要 collapsedIDs、homeHistory 或 panelHistory")
+                }
+                var collapsedIDs: Set<UUID>?
+                if let rawIDs = object["collapsedIDs"] {
+                    guard let ids = rawIDs as? [String], ids.allSatisfy({ UUID(uuidString: $0) != nil }) else {
+                        throw TaskCLIError.message("collapsedIDs 必须是 UUID 数组")
+                    }
+                    collapsedIDs = Set(ids.compactMap(UUID.init(uuidString:)))
+                }
+                for field in ["homeHistory", "panelHistory"] where object[field] != nil {
+                    guard object[field] is Bool else { throw TaskCLIError.message("历史开关必须为布尔值") }
+                }
+                if let collapsedIDs { state.collapsedTaskIDs = collapsedIDs }
+                if let show = object["homeHistory"] as? Bool { state.homeHistory = show }
+                if let show = object["panelHistory"] as? Bool { state.panelHistory = show }
+                result = ["updated": true]
+            case "window.home": windowCoordinator?.showHome(); result = ["shown": true]
+            case "window.settings": windowCoordinator?.showSettings(); result = ["shown": true]
+            case "window.panel": showOrFocusMainPanelAtFallback(); result = ["shown": true]
+            case "window.hide":
+                windowCoordinator?.hideWindowsForCLI()
+                result = ["hidden": true]
+            case "reminder.test": showReminder(testing: true); result = ["shown": true]
+            case "reminder.close": reminderPanelController?.close(); result = ["closed": true]
+            case "data.retry-load":
+                try confirmed()
+                guard store.loadError != nil else { throw TaskCLIError.message("没有需要恢复的读取错误") }
+                store.retryLoad()
+                result = try json(store.cliSnapshot())
+            case "data.retry-save": try store.retryPersist(); result = try json(store.cliSnapshot())
+            case "update.check":
+                guard let updater = appUpdater else { throw TaskCLIError.message("updater_unavailable") }
+                Task { _ = await updater.check(manual: true, settings: settings) }
+                result = ["accepted": true, "poll": "update.status"]
+            case "update.status":
+                result = ["checking": appUpdater?.isChecking ?? false,
+                          "installing": appUpdater?.isInstalling ?? false,
+                          "status": appUpdater?.statusText ?? "",
+                          "availableVersion": appUpdater?.availableUpdate?.version ?? ""] as [String: Any]
+            case "update.install":
+                try confirmed()
+                guard !isDevelopmentBuild, let update = appUpdater?.availableUpdate,
+                      appUpdater?.isInstalling == false else {
+                    throw TaskCLIError.message("开发版禁止升级，或尚无可安装版本；先 update.check")
+                }
+                Task { await self.installUpdate(update, offersRetry: false) }
+                result = ["accepted": true, "poll": "update.status"]
+            case "app.quit":
+                try confirmed()
+                guard TaskExpansionState.shared.activeEditors.isEmpty else {
+                    throw TaskCLIError.message("editor_busy")
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { NSApp.terminate(nil) }
+                result = ["accepted": true]
+            default: throw TaskCLIError.message("未知 command，请运行 help")
+            }
+            return try JSONSerialization.data(withJSONObject: ["ok": true, "result": result], options: [.sortedKeys])
+        } catch { return TaskCLI.failure(error.localizedDescription) }
     }
 
     @objc
@@ -443,6 +611,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private static func postMenuBarStatus(_ status: MenuBarStatus) {
+        guard TaskCLI.isolatedDirectory(bundleID: Bundle.main.bundleIdentifier ?? "") == nil else { return }
         DistributedNotificationCenter.default().postNotificationName(
             MenuBarBridgeProtocol.pendingCountChanged,
             object: nil,

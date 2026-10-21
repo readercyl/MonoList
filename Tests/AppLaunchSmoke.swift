@@ -35,6 +35,13 @@ struct AppLaunchSmoke {
 
         try requireDirectory(appURL, message: "MonoList.app 不存在")
         try requireExecutable(executableURL)
+        let executableHandle = try FileHandle(forReadingFrom: executableURL)
+        let magic = try executableHandle.read(upToCount: 4)
+        try executableHandle.close()
+        try require(magic == Data([0xcf, 0xfa, 0xed, 0xfe]),
+                    "主程序必须是 Mach-O，不能被 CLI 启动脚本覆盖")
+        try requireExecutable(contentsURL.appendingPathComponent("MacOS/monolist-cli"))
+
         try requireExecutable(helperExecutableURL)
 
         let data = try Data(contentsOf: plistURL)

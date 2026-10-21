@@ -1,3 +1,4 @@
+import CryptoKit
 import Combine
 import Foundation
 
@@ -137,6 +138,96 @@ final class TaskStore: ObservableObject {
         self.fileURL = fileURL
         self.writer = writer
         load()
+    }
+
+    private init(fileURL: URL, initialTasks: [TaskItem]) {
+        self.fileURL = fileURL
+        writer = CLIStagingWriter()
+        tasks = initialTasks
+    }
+
+    func cliSnapshot() throws -> TaskCLISnapshot {
+        try guardAvailable()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        encoder.dateEncodingStrategy = .millisecondsSince1970
+        let revision = SHA256.hash(data: try encoder.encode(tasks))
+            .map { String(format: "%02x", $0) }.joined()
+        return TaskCLISnapshot(revision: revision, tasks: pendingTasks + historyTasks)
+    }
+
+    func applyCLI(_ batch: TaskCLIBatch) throws -> TaskCLISnapshot {
+        guard try cliSnapshot().revision == batch.expectedRevision else {
+            throw TaskCLIError.message("conflict: 清单已变化，请重新读取；不要重复提交旧请求")
+        }
+        guard !batch.operations.isEmpty, batch.operations.count <= 500 else {
+            throw TaskCLIError.message("每批需要 1 至 500 个操作")
+        }
+        let staged = TaskStore(fileURL: fileURL, initialTasks: tasks)
+        for operation in batch.operations {
+            func id() throws -> UUID {
+                guard let id = operation.id else { throw TaskCLIError.message("缺少 id") }
+                return id
+            }
+            func text() throws -> String {
+                guard let text = operation.text, text.utf8.count <= 32_768 else {
+                    throw TaskCLIError.message("缺少 text 或文本过长")
+                }
+                return text
+            }
+            switch operation.kind {
+            case "add":
+                let newID = operation.id ?? UUID()
+                guard !staged.tasks.contains(where: { $0.id == newID }) else {
+                    throw TaskCLIError.message("id 已存在")
+                }
+                _ = try staged.add(text: text(), after: operation.afterID,
+                                   parentID: operation.parentID, id: newID)
+            case "edit": try staged.updateText(id: id(), text: text())
+            case "complete":
+                if let text = operation.text {
+                    try staged.complete(id: id(), finalText: text)
+                } else { try staged.complete(id: id()) }
+            case "restore": try staged.restore(id: id())
+            case "delete":
+                guard batch.confirm == true else { throw TaskCLIError.message("delete 需要 confirm:true") }
+                try staged.delete(id: id())
+            case "clear.pending", "clear.history", "clear.all":
+                guard batch.confirm == true else { throw TaskCLIError.message("清空需要 confirm:true") }
+                switch operation.kind {
+                case "clear.pending": try staged.clearPending()
+                case "clear.history": try staged.clearHistory()
+                default: try staged.clearAll()
+                }
+            case "indent": try staged.indent(id: id())
+            case "outdent": try staged.outdent(id: id())
+            case "parent": try staged.setParent(id: id(), parentID: operation.parentID)
+            case "move":
+                if let offset = operation.offset { try staged.move(id: id(), by: offset) }
+                else {
+                    try staged.move(id: id(), to: .shortTerm,
+                                    before: operation.beforeID, parentID: operation.parentID)
+                }
+            case "reorder":
+                guard let ids = operation.ids else { throw TaskCLIError.message("缺少 ids") }
+                try staged.reorder(ids: ids)
+            case "reminder": try staged.updateReminder(id: id(), reminder: operation.reminder)
+            default: throw TaskCLIError.message("未知任务操作: \(operation.kind)")
+            }
+        }
+        guard Set(staged.tasks.map(\.id)).count == staged.tasks.count else {
+            throw TaskCLIError.message("任务 id 重复")
+        }
+        try staged.validateHierarchy(in: staged.tasks)
+        // Keep a recoverable pre-write database, then publish the entire batch once.
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let backupURL = fileURL.deletingPathExtension().appendingPathExtension("cli-backup.json")
+        try AtomicFileWriter().write(encoder.encode(TaskDatabase(tasks: tasks)), to: backupURL)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
+        try commit(staged.tasks)
+        return try cliSnapshot()
     }
 
     @discardableResult
@@ -943,4 +1034,39 @@ final class TaskStore: ObservableObject {
         let history = loadedTasks.filter { $0.status == .history }
         return history + pending
     }
+}
+
+struct TaskCLISnapshot: Codable {
+    let revision: String
+    let tasks: [TaskItem]
+}
+
+struct TaskCLIBatch: Codable {
+    let expectedRevision: String
+    let confirm: Bool?
+    let operations: [TaskCLIOperation]
+}
+
+struct TaskCLIOperation: Codable {
+    let kind: String
+    var id: UUID? = nil
+    var text: String? = nil
+    var parentID: UUID? = nil
+    var afterID: UUID? = nil
+    var beforeID: UUID? = nil
+    var ids: [UUID]? = nil
+    var offset: Int? = nil
+    var reminder: TaskReminder? = nil
+}
+
+enum TaskCLIError: LocalizedError {
+    case message(String)
+    var errorDescription: String? {
+        if case .message(let message) = self { return message }
+        return nil
+    }
+}
+
+private struct CLIStagingWriter: AtomicWriting {
+    func write(_ data: Data, to destinationURL: URL) throws {}
 }

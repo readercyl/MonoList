@@ -240,7 +240,7 @@ struct SettingsView: View {
         }
     }
 
-    private static let systemSoundNames = [
+    static let systemSoundNames = [
         "Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero",
         "Morse", "Ping", "Pop", "Purr", "Sosumi", "Submarine", "Tink",
     ].filter { NSSound(named: NSSound.Name($0)) != nil }

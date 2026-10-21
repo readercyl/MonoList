@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CHECKS=(
+  check-task-cli.sh
   check-task-store.sh
   check-task-drop-coordinator.sh
   check-app-settings.sh

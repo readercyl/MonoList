@@ -37,7 +37,10 @@ struct HomeView: View {
     @State private var draftFocused = false
     @State private var draftRequestID = UUID()
     @State private var errorMessage: String?
-    @State private var showsOlderCompleted = true
+    private var showsOlderCompleted: Bool {
+        get { expansionState.homeHistory }
+        nonmutating set { expansionState.homeHistory = newValue }
+    }
     @State private var showsScrollToTop = false
     @State private var clearAction: HomeClearAction?
     @State private var taskRowHeights: [UUID: CGFloat] = [:]

@@ -141,7 +141,8 @@ cat > "$HELPER_CONTENTS_DIR/Info.plist" <<PLIST
 PLIST
 
 printf 'APPL????' > "$HELPER_CONTENTS_DIR/PkgInfo"
-chmod +x "$EXECUTABLE" "$HELPER_EXECUTABLE"
+cp "$ROOT_DIR/scripts/monolist" "$MACOS_DIR/monolist-cli"
+chmod +x "$EXECUTABLE" "$HELPER_EXECUTABLE" "$MACOS_DIR/monolist-cli"
 
 if [[ -n "$CODESIGN_IDENTITY" ]]; then
   codesign --force --sign "$CODESIGN_IDENTITY" "$HELPER_APP_DIR" >/dev/null

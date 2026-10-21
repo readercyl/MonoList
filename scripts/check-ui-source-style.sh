@@ -47,8 +47,8 @@ if ! grep -q 'Text("今天")' "$TASK_LIST" ||
   exit 1
 fi
 
-if ! grep -q '@State private var showsOlderCompleted = false' "$TASK_LIST" ||
-   ! grep -q '@State private var showsOlderCompleted = true' "$HOME_VIEW"; then
+if ! grep -q 'get { expansionState.panelHistory }' "$TASK_LIST" ||
+   ! grep -q 'get { expansionState.homeHistory }' "$HOME_VIEW"; then
   echo "主页历史默认展开，浮窗历史默认隐藏但必须保留已完成区块。" >&2
   exit 1
 fi

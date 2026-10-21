@@ -173,6 +173,15 @@ final class AppSettings: ObservableObject {
         load()
     }
 
+    func backupForCLI() throws {
+        guard loadError == nil else { throw AppSettingsError.recoveryRequired }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let backupURL = fileURL.deletingPathExtension().appendingPathExtension("cli-backup.json")
+        try AtomicFileWriter().write(encoder.encode(SettingsDatabase(values: values)), to: backupURL)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
+    }
+
     func update(_ mutation: (inout SettingsValues) -> Void) throws {
         guard loadError == nil else {
             throw AppSettingsError.recoveryRequired

@@ -3,16 +3,20 @@ import SwiftUI
 @MainActor
 final class TaskExpansionState: ObservableObject {
     static let shared = TaskExpansionState()
+    var activeEditors: Set<UUID> = []
+    @Published var homeHistory = true
+    @Published var panelHistory = false
     private let defaults: UserDefaults
     @Published var collapsedTaskIDs: Set<UUID> {
         didSet {
+            guard ProcessInfo.processInfo.environment["MONOLIST_CLI_TEST_DIRECTORY"] == nil else { return }
             defaults.set(collapsedTaskIDs.map(\.uuidString).sorted(), forKey: "taskCollapsedIDs.v2")
         }
     }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        collapsedTaskIDs = Set((defaults.stringArray(forKey: "taskCollapsedIDs.v2") ?? [])
+        collapsedTaskIDs = ProcessInfo.processInfo.environment["MONOLIST_CLI_TEST_DIRECTORY"] != nil ? [] : Set((defaults.stringArray(forKey: "taskCollapsedIDs.v2") ?? [])
             .compactMap(UUID.init(uuidString:)))
     }
 }
@@ -39,6 +43,7 @@ struct TaskRowView: View {
     let onOutdent: (() -> Bool)?
     let subtaskCompletionStates: [Bool]
 
+    @State private var editToken = UUID()
     @State private var text: String
     @State private var originalText: String
     @State private var isEditingMode = false
@@ -212,6 +217,16 @@ struct TaskRowView: View {
             reduceMotion ? nil : .easeOut(duration: 0.16),
             value: isCompleting
         )
+        .onChange(of: isEditingMode) { _, editing in
+            if editing { TaskExpansionState.shared.activeEditors.insert(editToken) }
+            else { TaskExpansionState.shared.activeEditors.remove(editToken) }
+        }
+        .onDisappear { TaskExpansionState.shared.activeEditors.remove(editToken) }
+        .onChange(of: item.text) { _, updatedText in
+            guard !isEditingMode else { return }
+            text = updatedText
+            originalText = updatedText
+        }
         .onChange(of: isEditorFocused) { oldValue, newValue in
             if oldValue && !newValue && isEditingMode {
                 finishEditing()
@@ -341,6 +356,7 @@ struct TaskRowView: View {
     private func beginEditing() {
         originalText = text
         onSelect()
+        TaskExpansionState.shared.activeEditors.insert(editToken)
         isEditingMode = true
         onEditingChanged(true)
     }
@@ -366,6 +382,7 @@ struct TaskRowView: View {
         saveIfNeeded()
         isEditorFocused = false
         isEditingMode = false
+        TaskExpansionState.shared.activeEditors.remove(editToken)
         onEditingChanged(false)
     }
 

@@ -1,0 +1,7 @@
+#!/bin/bash
+set -euo pipefail
+CLI_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [[ -x "$CLI_DIR/MonoList" ]]; then
+  exec "$CLI_DIR/MonoList" --cli "$@"
+fi
+exec "$CLI_DIR/../build/local/MonoList 开发版.app/Contents/MacOS/MonoList" --cli "$@"
