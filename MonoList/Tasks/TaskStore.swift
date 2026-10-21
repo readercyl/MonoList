@@ -561,10 +561,8 @@ final class TaskStore: ObservableObject {
         guard let sourceIndex = siblings.firstIndex(where: { $0.id == id }) else {
             throw TaskStoreError.missingTask
         }
-        let destinationIndex = min(
-            max(sourceIndex + offset, siblings.startIndex),
-            siblings.index(before: siblings.endIndex)
-        )
+        let boundedOffset = min(max(offset, -sourceIndex), siblings.count - 1 - sourceIndex)
+        let destinationIndex = sourceIndex + boundedOffset
         guard sourceIndex != destinationIndex else {
             return
         }
@@ -885,6 +883,8 @@ final class TaskStore: ObservableObject {
 
     private func commit(_ candidate: [TaskItem]) throws {
         try guardAvailable()
+        // Invalid mutations must leave both disk and the write-retry state untouched.
+        try validateHierarchy(in: candidate)
         do {
             try persist(candidate)
             tasks = candidate
@@ -1004,7 +1004,12 @@ final class TaskStore: ObservableObject {
     }
 
     private func validateHierarchy(in candidate: [TaskItem]) throws {
-        let itemsByID = Dictionary(uniqueKeysWithValues: candidate.map { ($0.id, $0) })
+        var itemsByID: [UUID: TaskItem] = [:]
+        for item in candidate {
+            guard itemsByID.updateValue(item, forKey: item.id) == nil else {
+                throw TaskStoreError.invalidHierarchy
+            }
+        }
         for item in candidate {
             guard let parentID = item.parentID else { continue }
             guard let parent = itemsByID[parentID],

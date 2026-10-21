@@ -38,6 +38,9 @@ struct TaskStoreSmoke {
         try testWriteFailureKeepsCommittedState()
         try testUnknownSchemaDoesNotOverwriteFile()
         try testDamagedFileDoesNotGetOverwritten()
+        try testRejectNestedParentBeforeSaving()
+        try testDuplicateIDsEnterRecovery()
+        try testExtremeMoveOffsets()
         print("Task store smoke passed.")
     }
 
@@ -560,6 +563,49 @@ struct TaskStoreSmoke {
         try require(store.loadError != nil, "损坏文件没有进入恢复状态")
         try require(try Data(contentsOf: fixture.fileURL) == original,
                     "损坏文件被覆盖")
+    }
+
+    @MainActor
+    private static func testRejectNestedParentBeforeSaving() throws {
+        let fixture = try Fixture()
+        let store = TaskStore(fileURL: fixture.fileURL)
+        _ = try store.add(text: "root A")
+        let parent = try store.add(text: "root B")
+        _ = try store.add(text: "child", parentID: parent.id)
+        let original = try Data(contentsOf: fixture.fileURL)
+        do {
+            try store.indent(id: parent.id)
+            throw TestFailure.failed("A parent with children must not become a child")
+        } catch TaskStoreError.invalidHierarchy {}
+        try require(!store.isWritePaused, "Validation failure must not pause writes")
+        try require(try Data(contentsOf: fixture.fileURL) == original, "Invalid hierarchy was saved")
+        try require(TaskStore(fileURL: fixture.fileURL).loadError == nil, "Saved tasks cannot reload")
+    }
+
+    @MainActor
+    private static func testDuplicateIDsEnterRecovery() throws {
+        let fixture = try Fixture()
+        let source = TaskStore(fileURL: fixture.directoryURL.appendingPathComponent("source.json"))
+        let task = try source.add(text: "synthetic")
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let original = try encoder.encode(TaskDatabase(tasks: [task, task]))
+        try original.write(to: fixture.fileURL)
+        let store = TaskStore(fileURL: fixture.fileURL)
+        try require(store.loadError != nil, "Duplicate IDs must enter recovery")
+        try require(try Data(contentsOf: fixture.fileURL) == original, "Recovery changed the source")
+    }
+
+    @MainActor
+    private static func testExtremeMoveOffsets() throws {
+        let fixture = try Fixture()
+        let store = TaskStore(fileURL: fixture.fileURL)
+        let first = try store.add(text: "first")
+        let second = try store.add(text: "second")
+        try store.move(id: second.id, by: Int.max)
+        try require(store.pendingTasks.map(\.id) == [first.id, second.id], "Upper clamp failed")
+        try store.move(id: second.id, by: Int.min)
+        try require(store.pendingTasks.map(\.id) == [second.id, first.id], "Lower clamp failed")
     }
 
     private static func require(_ condition: @autoclosure () throws -> Bool,

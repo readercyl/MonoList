@@ -45,6 +45,17 @@ with tempfile.TemporaryDirectory(prefix="monolist-cli-integration-") as director
         call("apply", {"expectedRevision": snapshot["revision"], "operations": [
             {"kind": "edit", "id": child, "text": "stale"}]}, ok=False)
         assert call("list")["tasks"][1]["text"] == "Synthetic revised child"
+        extra = str(uuid.uuid4())
+        call("apply", {"expectedRevision": call("list")["revision"], "operations": [
+            {"kind": "add", "id": extra, "text": "Synthetic standalone"}]})
+        for offset in [2**63 - 1, -(2**63)]:
+            call("apply", {"expectedRevision": call("list")["revision"], "operations": [
+                {"kind": "move", "id": extra, "offset": offset}]})
+        assert call("list")["tasks"][0]["id"] == extra.upper()
+        before = call("list")
+        call("apply", {"expectedRevision": before["revision"], "operations": [
+            {"kind": "indent", "id": parent}]}, ok=False)
+        assert call("list")["revision"] == before["revision"]
         call("apply", {"expectedRevision": call("list")["revision"], "operations": [
             {"kind": "delete", "id": parent}]}, ok=False)
         call("view.set", {"collapsedIDs": [parent], "homeHistory": False, "panelHistory": True})

@@ -31,7 +31,8 @@ final class UpdateInstaller {
 
     func install(
         _ update: AppUpdate,
-        replacing appURL: URL = Bundle.main.bundleURL
+        replacing appURL: URL = Bundle.main.bundleURL,
+        helperProcessID: Int32? = nil
     ) async throws {
         guard FileManager.default.isWritableFile(
             atPath: appURL.deletingLastPathComponent().path
@@ -62,6 +63,8 @@ final class UpdateInstaller {
                 dmgURL.path,
                 update.version,
                 scriptURL.path,
+                String(ProcessInfo.processInfo.processIdentifier),
+                String(helperProcessID ?? 0),
             ]
             try process.run()
             NSApp.terminate(nil)
@@ -199,6 +202,19 @@ final class UpdateInstaller {
         _ = try output(executable, arguments)
     }
 
+    static let processWaitScript = """
+    wait_for_processes() {
+      local deadline=$((SECONDS + $1))
+      while kill -0 "$PARENT_PID" 2>/dev/null ||
+            { [[ "$HELPER_PID" -gt 0 ]] && kill -0 "$HELPER_PID" 2>/dev/null; }; do
+        if [[ "$SECONDS" -ge "$deadline" ]]; then
+          return 1
+        fi
+        sleep 0.2
+      done
+    }
+    """
+
     static let updaterScript = """
     #!/usr/bin/env bash
     set -euo pipefail
@@ -207,6 +223,8 @@ final class UpdateInstaller {
     DMG_PATH="$2"
     TARGET_VERSION="$3"
     SCRIPT_PATH="$4"
+    PARENT_PID="${5:?Missing application PID}"
+    HELPER_PID="${6:?Missing helper PID}"
     BUNDLE_ID="com.qingcheng.monolist.mac"
     BACKUP_PATH="${APP_PATH}.update-backup"
     MOUNT_DIR="$(mktemp -d)"
@@ -231,11 +249,15 @@ final class UpdateInstaller {
       exit 1
     }
 
+    \(processWaitScript)
+
     trap fail ERR
-    while pgrep -x MonoList >/dev/null 2>&1 ||
-          pgrep -x MenuBarService >/dev/null 2>&1; do
-      sleep 0.2
-    done
+    if ! wait_for_processes 30; then
+      # Keep the installed app intact if this instance cannot exit in time.
+      open "$APP_PATH" || true
+      cleanup
+      exit 1
+    fi
 
     hdiutil verify "$DMG_PATH" >/dev/null
     hdiutil attach "$DMG_PATH" -nobrowse -readonly -mountpoint "$MOUNT_DIR" >/dev/null

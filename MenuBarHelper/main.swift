@@ -35,7 +35,7 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
         }
         countObserver = DistributedNotificationCenter.default().addObserver(
             forName: MenuBarBridgeProtocol.pendingCountChanged,
-            object: nil,
+            object: MenuBarBridgeProtocol.channel(parentProcessID: parentProcessID),
             queue: .main
         ) { [weak self] notification in
             guard let countNumber = notification.userInfo?["count"] as? NSNumber else {
@@ -98,7 +98,7 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
         } ?? NSScreen.main
         DistributedNotificationCenter.default().postNotificationName(
             MenuBarBridgeProtocol.showMainPanel,
-            object: nil,
+            object: MenuBarBridgeProtocol.channel(parentProcessID: parentProcessID),
             userInfo: [
                 "x": frame.midX,
                 "y": screen?.visibleFrame.maxY ?? frame.minY,
@@ -120,7 +120,7 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
         } ?? NSScreen.main
         DistributedNotificationCenter.default().postNotificationName(
             MenuBarBridgeProtocol.statusItemFrameChanged,
-            object: nil,
+            object: MenuBarBridgeProtocol.channel(parentProcessID: parentProcessID),
             userInfo: [
                 "x": frame.minX,
                 "y": frame.minY,
@@ -137,7 +137,7 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
     private func openSettings() {
         DistributedNotificationCenter.default().postNotificationName(
             MenuBarBridgeProtocol.openSettings,
-            object: nil,
+            object: MenuBarBridgeProtocol.channel(parentProcessID: parentProcessID),
             deliverImmediately: true
         )
     }
@@ -146,7 +146,7 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
     private func quitApplication() {
         DistributedNotificationCenter.default().postNotificationName(
             MenuBarBridgeProtocol.quit,
-            object: nil,
+            object: MenuBarBridgeProtocol.channel(parentProcessID: parentProcessID),
             deliverImmediately: true
         )
     }

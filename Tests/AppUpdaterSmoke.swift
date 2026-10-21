@@ -9,6 +9,10 @@ struct AppUpdaterSmoke {
         precondition(AppUpdater.isValidVersionTag("v0.1.0"))
         precondition(!AppUpdater.isValidVersionTag("1.0"))
         precondition(!AppUpdater.isValidVersionTag("v1.0.0-beta"))
+        for invalid in ["v999999999999999999999999999999.1.0", "v١.2.3", "v1..0"] {
+            precondition(!AppUpdater.isValidVersionTag(invalid))
+            precondition(AppUpdater.compareVersions(invalid, "v1.0.0") == .orderedSame)
+        }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ReleaseURLProtocol.self]
         let session = URLSession(configuration: configuration)

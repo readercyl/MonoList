@@ -443,7 +443,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBarObservers = [
             center.addObserver(
                 forName: MenuBarBridgeProtocol.showMainPanel,
-                object: nil,
+                object: MenuBarBridgeProtocol.channel(parentProcessID: ProcessInfo.processInfo.processIdentifier),
                 queue: .main
             ) { [weak self] notification in
                 guard let xNumber = notification.userInfo?["x"] as? NSNumber,
@@ -461,14 +461,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             center.addObserver(
                 forName: MenuBarBridgeProtocol.openSettings,
-                object: nil,
+                object: MenuBarBridgeProtocol.channel(parentProcessID: ProcessInfo.processInfo.processIdentifier),
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor in self?.openSettings() }
             },
             center.addObserver(
                 forName: MenuBarBridgeProtocol.statusItemFrameChanged,
-                object: nil,
+                object: MenuBarBridgeProtocol.channel(parentProcessID: ProcessInfo.processInfo.processIdentifier),
                 queue: .main
             ) { [weak self] notification in
                 let values = notification.userInfo
@@ -497,7 +497,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             center.addObserver(
                 forName: MenuBarBridgeProtocol.quit,
-                object: nil,
+                object: MenuBarBridgeProtocol.channel(parentProcessID: ProcessInfo.processInfo.processIdentifier),
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor in self?.quitApplication() }
@@ -556,7 +556,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         updater.beginInstallation()
         do {
-            try await installer.install(update)
+            try await installer.install(update, helperProcessID: menuBarHelperApplication?.processIdentifier)
         } catch {
             updater.installationFailed()
             guard offersRetry else { return }
@@ -570,7 +570,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             updater.beginInstallation()
             do {
-                try await installer.install(update)
+                try await installer.install(update, helperProcessID: menuBarHelperApplication?.processIdentifier)
             } catch {
                 updater.installationFailed()
             }
@@ -614,7 +614,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard TaskCLI.isolatedDirectory(bundleID: Bundle.main.bundleIdentifier ?? "") == nil else { return }
         DistributedNotificationCenter.default().postNotificationName(
             MenuBarBridgeProtocol.pendingCountChanged,
-            object: nil,
+            object: MenuBarBridgeProtocol.channel(parentProcessID: ProcessInfo.processInfo.processIdentifier),
             userInfo: ["count": status.pendingCount],
             deliverImmediately: true
         )

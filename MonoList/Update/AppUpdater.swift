@@ -190,10 +190,11 @@ final class AppUpdater: ObservableObject {
         let normalized = version.hasPrefix("v") ? String(version.dropFirst()) : version
         let parts = normalized.split(separator: ".", omittingEmptySubsequences: false)
         guard parts.count == 3,
-              parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isNumber) }) else {
+              parts.allSatisfy({ !$0.isEmpty && $0.utf8.allSatisfy({ (48...57).contains($0) }) }) else {
             return nil
         }
-        return parts.compactMap { Int($0) }
+        let numbers = parts.compactMap { Int($0) }
+        return numbers.count == 3 ? numbers : nil
     }
 
     private static var bundleShortVersion: String {
