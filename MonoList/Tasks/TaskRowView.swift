@@ -172,19 +172,6 @@ struct TaskRowView: View {
                 value: reminderTitle
             )
 
-            Button(action: onDelete) {
-                Image(systemName: "trash")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
-                    .opacity(isHovered || isSelected ? 1 : 0)
-                    .animation(
-                        reduceMotion ? nil : .easeOut(duration: 0.16),
-                        value: isHovered || isSelected
-                    )
-            }
-            .buttonStyle(.plain)
-            .help("删除")
-
             if canAddSubtask, let onAddSubtask {
                 Button(action: onAddSubtask) {
                     Image(systemName: "plus")
@@ -198,7 +185,22 @@ struct TaskRowView: View {
                 }
                 .buttonStyle(.plain)
                 .help("添加子任务")
+                .offset(y: -3)
             }
+
+            Button(action: onDelete) {
+                Image(systemName: "trash")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .opacity(isHovered || isSelected ? 1 : 0)
+                    .animation(
+                        reduceMotion ? nil : .easeOut(duration: 0.16),
+                        value: isHovered || isSelected
+                    )
+            }
+            .buttonStyle(.plain)
+            .help("删除")
+            .offset(y: -3)
         }
         .padding(.leading, CGFloat(indentationLevel) * 21 + 8)
         .padding(.trailing, 8)
