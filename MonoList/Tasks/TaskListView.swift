@@ -19,6 +19,7 @@ struct TaskListView: View {
     @State private var draftRequestID = UUID()
     @State private var collapsedTaskIDs: Set<UUID> = []
     @State private var measuredTaskContentHeight: CGFloat = 0
+    @State private var taskRowHeights: [UUID: CGFloat] = [:]
     @StateObject private var dropCoordinator = TaskDropCoordinator()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -317,7 +318,7 @@ struct TaskListView: View {
                 hasSubtasks: !children.isEmpty,
                 parentID: nil,
                 upperBeforeID: root.id,
-                lowerBeforeID: nil
+                lowerBeforeID: store.nextPendingSiblingID(after: root)
             )
 
             if !collapsedTaskIDs.contains(root.id) {
@@ -403,8 +404,18 @@ struct TaskListView: View {
                 }
             },
             subtaskProgressText: store.subtaskProgressText(for: item.id),
-            priorityRank: priorityRank
+            priorityRank: priorityRank,
+            sequenceNumber: store.pendingSequenceNumber(for: item)
         )
+        .background {
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear { taskRowHeights[item.id] = geometry.size.height }
+                    .onChange(of: geometry.size.height) { _, height in
+                        taskRowHeights[item.id] = height
+                    }
+            }
+        }
         .overlay(alignment: .top) {
             if dropCoordinator.target == TaskDropTarget(
                 group: .shortTerm,
@@ -437,7 +448,7 @@ struct TaskListView: View {
                 parentID: parentID,
                 upperBeforeID: upperBeforeID,
                 lowerBeforeID: lowerBeforeID,
-                rowHeight: 40,
+                rowHeight: taskRowHeights[item.id] ?? 40,
                 sessionID: dropCoordinator.sessionID,
                 store: store,
                 coordinator: dropCoordinator,
@@ -1013,9 +1024,12 @@ private struct PanelTaskDropDelegate: DropDelegate {
 
     private func updateTarget(_ info: DropInfo) {
         guard let sessionID else { return }
-        let target = TaskDropTarget(
+        let target = coordinator.dropTarget(
             group: group,
-            beforeID: info.location.y < rowHeight / 2 ? upperBeforeID : lowerBeforeID,
+            upperBeforeID: upperBeforeID,
+            lowerBeforeID: lowerBeforeID,
+            locationY: info.location.y,
+            rowHeight: rowHeight,
             parentID: parentID
         )
         guard coordinator.target != target else { return }

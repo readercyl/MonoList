@@ -21,6 +21,7 @@ struct TaskRowView: View {
     let onIndent: (() -> Bool)?
     let onOutdent: (() -> Bool)?
     let subtaskProgressText: String?
+    let sequenceNumber: Int?
     let priorityRank: Int?
 
     @State private var text: String
@@ -53,7 +54,8 @@ struct TaskRowView: View {
         onIndent: (() -> Bool)? = nil,
         onOutdent: (() -> Bool)? = nil,
         subtaskProgressText: String? = nil,
-        priorityRank: Int? = nil
+        priorityRank: Int? = nil,
+        sequenceNumber: Int? = nil
     ) {
         self.item = item
         self.onSave = onSave
@@ -75,6 +77,7 @@ struct TaskRowView: View {
         self.onIndent = onIndent
         self.onOutdent = onOutdent
         self.subtaskProgressText = subtaskProgressText
+        self.sequenceNumber = sequenceNumber
         self.priorityRank = priorityRank
         _text = State(initialValue: item.text)
         _originalText = State(initialValue: item.text)
@@ -90,6 +93,15 @@ struct TaskRowView: View {
                 isCompleting: isCompleting,
                 action: beginCompletion
             )
+
+            if let sequenceNumber {
+                Text("\(sequenceNumber)、")
+                    .font(.system(size: 12))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+                    .accessibilityLabel("第\(sequenceNumber)项")
+            }
 
             VStack(alignment: .leading, spacing: 4) {
                 Group {

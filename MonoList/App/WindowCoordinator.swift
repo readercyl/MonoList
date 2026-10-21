@@ -3,7 +3,7 @@ import SwiftUI
 
 @MainActor
 final class WindowCoordinator {
-    static let mainPanelWidth: CGFloat = 336
+    static let mainPanelWidth: CGFloat = 380
     static let mainPanelMinimumHeight: CGFloat = 106
     static let mainPanelMaximumHeight: CGFloat = 560
     static let homeWindowDefaultSize = NSSize(width: 400, height: 660)

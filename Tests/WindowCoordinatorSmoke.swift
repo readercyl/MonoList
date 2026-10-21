@@ -12,7 +12,7 @@ struct WindowCoordinatorSmoke {
         let store = TaskStore(fileURL: directory.appendingPathComponent("tasks.json"))
         let coordinator = WindowCoordinator(taskStore: store)
 
-        precondition(WindowCoordinator.mainPanelWidth == 336)
+        precondition(WindowCoordinator.mainPanelWidth == 380)
         precondition(WindowCoordinator.mainPanelMaximumHeight == 560)
         precondition(WindowCoordinator.homeWindowDefaultSize.width == 400)
         precondition(WindowCoordinator.homeWindowDefaultSize.height == 660)

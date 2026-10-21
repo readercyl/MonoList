@@ -77,6 +77,21 @@ final class TaskStore: ObservableObject {
         pendingTasks.filter { $0.group == group && $0.parentID == nil }
     }
 
+    private func pendingSiblings(of item: TaskItem) -> [TaskItem] {
+        pendingTasks.filter { $0.parentID == item.parentID }
+    }
+
+    func pendingSequenceNumber(for item: TaskItem) -> Int? {
+        pendingSiblings(of: item).firstIndex { $0.id == item.id }.map { $0 + 1 }
+    }
+
+    func nextPendingSiblingID(after item: TaskItem) -> UUID? {
+        let siblings = pendingSiblings(of: item)
+        guard let index = siblings.firstIndex(where: { $0.id == item.id }),
+              siblings.indices.contains(index + 1) else { return nil }
+        return siblings[index + 1].id
+    }
+
     func children(of parentID: UUID) -> [TaskItem] {
         tasks
             .filter { $0.parentID == parentID }
