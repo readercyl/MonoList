@@ -16,16 +16,16 @@ for source in "$TASK_LIST" "$HOME_VIEW" "$TASK_ROW" "$WINDOW_COORDINATOR"; do
   fi
 done
 
-if ! rg -q 'chevron.down.*chevron.right' "$TASK_ROW" ||
+if rg -q 'isExpanded.*chevron' "$TASK_ROW" ||
    ! rg -q 'Button\(action: onToggleSubtasks\)' "$TASK_ROW"; then
-  echo "父任务进度旁必须提供展开与收起入口。" >&2
+  echo "圆点行必须可展开收起，且不显示箭头。" >&2
   exit 1
 fi
 
 if rg -q 'priorityRank' "$TASK_ROW" "$TASK_LIST" "$HOME_VIEW" ||
-   ! rg -q 'textFontSize: CGFloat \{ 14 \}' "$TASK_ROW" ||
+   ! rg -q 'textFontSize: CGFloat \{ hasSubtasks \? 15 : 14 \}' "$TASK_ROW" ||
    ! rg -q 'HStack\(alignment: .firstTextBaseline, spacing: 0\)' "$TASK_ROW"; then
-  echo "同级待办字号必须统一，编号与正文首行对齐。" >&2
+  echo "父任务使用大一号字号，编号与正文首行对齐。" >&2
   exit 1
 fi
 

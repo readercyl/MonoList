@@ -5,7 +5,7 @@ import SwiftUI
 @main
 struct WindowCoordinatorSmoke {
     @MainActor
-    static func main() throws {
+    static func main() async throws {
         _ = NSApplication.shared
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("MonoListWindowTests-\(UUID().uuidString)")
@@ -112,7 +112,36 @@ struct WindowCoordinatorSmoke {
         precondition(!windowSource.contains("private var settingsWindow"))
 
         coordinator.showMainPanel(at: NSPoint(x: 700, y: 800))
-        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        try await Task.sleep(nanoseconds: 50_000_000)
+        coordinator.closeMainPanel(animated: false)
+        let previousCollapsed = TaskExpansionState.shared.collapsedTaskIDs
+        defer { TaskExpansionState.shared.collapsedTaskIDs = previousCollapsed }
+        let parent = try store.add(text: "布局测试父任务")
+        for index in 0..<6 {
+            _ = try store.add(text: "子任务 \(index)", parentID: parent.id)
+        }
+        TaskExpansionState.shared.collapsedTaskIDs = [parent.id]
+        coordinator.showMainPanel(at: NSPoint(x: 700, y: 800))
+        try await Task.sleep(nanoseconds: 500_000_000)
+        let visiblePanel = NSApp.windows.first {
+            $0 is NSPanel && $0.isVisible && $0.frame.width == WindowCoordinator.mainPanelWidth
+        }!
+        precondition(TaskExpansionState().collapsedTaskIDs.contains(parent.id))
+        let collapsedHeight = visiblePanel.frame.height
+        precondition(collapsedHeight < 300, "Collapsed children must not inflate panel height")
+        TaskExpansionState.shared.collapsedTaskIDs = []
+        try await Task.sleep(nanoseconds: 500_000_000)
+        precondition(visiblePanel.frame.height > collapsedHeight + 50, "Expanded \(visiblePanel.frame.height), collapsed \(collapsedHeight)")
+        TaskExpansionState.shared.collapsedTaskIDs = [parent.id]
+        try await Task.sleep(nanoseconds: 500_000_000)
+        precondition(abs(visiblePanel.frame.height - collapsedHeight) < 2)
+        coordinator.closeMainPanel(animated: false)
+        coordinator.showMainPanel(at: NSPoint(x: 700, y: 800))
+        try await Task.sleep(nanoseconds: 500_000_000)
+        let reopenedPanel = NSApp.windows.first {
+            $0 is NSPanel && $0.isVisible && $0.frame.width == WindowCoordinator.mainPanelWidth
+        }!
+        precondition(abs(reopenedPanel.frame.height - collapsedHeight) < 2)
         coordinator.closeMainPanel(animated: false)
         print("Window coordinator smoke passed.")
     }

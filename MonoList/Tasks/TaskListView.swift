@@ -17,7 +17,12 @@ struct TaskListView: View {
     @State private var currentDate = Date()
     @State private var draftFocused = false
     @State private var draftRequestID = UUID()
-    @State private var collapsedTaskIDs: Set<UUID> = []
+    @StateObject private var expansionState = TaskExpansionState.shared
+    private var collapsedTaskIDs: Set<UUID> {
+        get { expansionState.collapsedTaskIDs }
+        nonmutating set { expansionState.collapsedTaskIDs = newValue }
+    }
+
     @State private var measuredTaskContentHeight: CGFloat = 0
     @State private var taskRowHeights: [UUID: CGFloat] = [:]
     @StateObject private var dropCoordinator = TaskDropCoordinator()
@@ -63,7 +68,7 @@ struct TaskListView: View {
         let measuredHeight = measuredTaskContentHeight > 0
             ? measuredTaskContentHeight + 53
             : 0
-        return max(estimatedHeight, measuredHeight)
+        return measuredTaskContentHeight > 0 ? measuredHeight : estimatedHeight
     }
 
     private var preferredHeight: CGFloat {
@@ -248,7 +253,7 @@ struct TaskListView: View {
                     clearInteraction()
                 }
 
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 pendingSection
                 completedSection
             }
@@ -858,7 +863,7 @@ private struct PanelTaskDragPreview: View {
         .shadow(color: .black.opacity(0.14), radius: 6, y: 2)
     }
 
-    private var fontSize: CGFloat { 14 }
+    private var fontSize: CGFloat { hasSubtasks ? 15 : 14 }
 
     private var fontWeight: Font.Weight {
         hasSubtasks ? .semibold : .regular
@@ -905,23 +910,24 @@ private struct PanelCompletedTaskRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 9) {
+        HStack(alignment: .top, spacing: 9) {
             if indentationLevel > 0 {
                 Color.clear.frame(width: 20, height: 28)
             }
             Button(action: onRestore) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 18))
+                    .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .frame(width: 28, height: 28)
             }
             .buttonStyle(.plain)
+            .offset(y: -3)
             Text(item.text)
-                .font(.system(size: 13))
+                .font(.system(size: hasSubtasks ? 15 : 14, weight: hasSubtasks ? .semibold : .regular))
                 .strikethrough()
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 5)
+                .padding(.vertical, 2)
                 .contentShape(Rectangle())
                 .onTapGesture {
                     if hasSubtasks {
@@ -938,7 +944,7 @@ private struct PanelCompletedTaskRow: View {
         }
         .padding(.leading, CGFloat(indentationLevel) * 21 + 8)
         .padding(.trailing, 8)
-        .padding(.vertical, 3)
+        .padding(.vertical, 1)
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
         .contextMenu {

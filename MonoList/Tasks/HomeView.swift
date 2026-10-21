@@ -26,7 +26,12 @@ struct HomeView: View {
 
     @StateObject private var draftState = TaskDraftState()
     @State private var currentDate = Date()
-    @State private var collapsedTaskIDs: Set<UUID> = []
+    @StateObject private var expansionState = TaskExpansionState.shared
+    private var collapsedTaskIDs: Set<UUID> {
+        get { expansionState.collapsedTaskIDs }
+        nonmutating set { expansionState.collapsedTaskIDs = newValue }
+    }
+
     @State private var selectedTaskID: UUID?
     @State private var editingTaskID: UUID?
     @State private var draftFocused = false
@@ -126,7 +131,7 @@ struct HomeView: View {
             Divider().opacity(0.45)
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Color.clear
                             .frame(height: 1)
                             .id("home-scroll-top")
@@ -260,22 +265,22 @@ struct HomeView: View {
     }
 
     private var taskList: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 10) {
             pendingSection
             completedSection
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     private var pendingSection: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
                 Text("未完成")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                 Text("\(store.pendingTasks.count)")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.tertiary)
                 Spacer()
             }
@@ -447,12 +452,12 @@ struct HomeView: View {
     }
 
     private var completedSection: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
                 Text("已完成")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                 Text("\(store.historyTasks.count)")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.tertiary)
                 Spacer()
                 if hasOlderCompleted {
@@ -493,7 +498,7 @@ struct HomeView: View {
 
     private func completedDateHeader(_ date: Date, isToday: Bool) -> some View {
         Text(isToday ? "今天" : date.formatted(.dateTime.year().month().day()))
-            .font(.system(size: 11, weight: .medium))
+            .font(.system(size: 10, weight: .medium))
             .foregroundStyle(.tertiary)
             .padding(.horizontal, 8)
             .padding(.top, 5)
@@ -750,7 +755,7 @@ private struct HomeHeaderIconButtonStyle: ButtonStyle {
 private struct HomeInlineButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 11, weight: .medium))
+            .font(.system(size: 10, weight: .medium))
             .foregroundStyle(configuration.isPressed ? Color.primary : Color.secondary)
             .padding(.horizontal, 8)
             .frame(minHeight: 26)
@@ -791,26 +796,27 @@ private struct HomeCompletedTaskRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 9) {
+        HStack(alignment: .top, spacing: 9) {
             if indentationLevel > 0 {
                 Color.clear.frame(width: 20, height: 28)
             }
 
             Button(action: onRestore) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 18))
+                    .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .frame(width: 28, height: 28)
             }
             .buttonStyle(.plain)
             .help("恢复为未完成")
+            .offset(y: -3)
 
             Text(item.text)
-                .font(.system(size: 13))
+                .font(.system(size: hasSubtasks ? 15 : 14, weight: hasSubtasks ? .semibold : .regular))
                 .strikethrough()
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 5)
+                .padding(.vertical, 2)
                 .contentShape(Rectangle())
                 .onTapGesture {
                     if hasSubtasks {
@@ -829,7 +835,7 @@ private struct HomeCompletedTaskRow: View {
         }
         .padding(.leading, CGFloat(indentationLevel) * 21 + 8)
         .padding(.trailing, 8)
-        .padding(.vertical, 3)
+        .padding(.vertical, 1)
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
         .contextMenu {
@@ -864,7 +870,7 @@ private struct HomeTaskDragPreview: View {
         .shadow(color: .black.opacity(0.14), radius: 6, y: 2)
     }
 
-    private var fontSize: CGFloat { 14 }
+    private var fontSize: CGFloat { hasSubtasks ? 15 : 14 }
 
     private var fontWeight: Font.Weight {
         hasSubtasks ? .semibold : .regular

@@ -1,5 +1,22 @@
 import SwiftUI
 
+@MainActor
+final class TaskExpansionState: ObservableObject {
+    static let shared = TaskExpansionState()
+    private let defaults: UserDefaults
+    @Published var collapsedTaskIDs: Set<UUID> {
+        didSet {
+            defaults.set(collapsedTaskIDs.map(\.uuidString).sorted(), forKey: "taskCollapsedIDs.v2")
+        }
+    }
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        collapsedTaskIDs = Set((defaults.stringArray(forKey: "taskCollapsedIDs.v2") ?? [])
+            .compactMap(UUID.init(uuidString:)))
+    }
+}
+
 struct TaskRowView: View {
     let item: TaskItem
     let onSave: (String) -> Void
@@ -23,6 +40,7 @@ struct TaskRowView: View {
     let subtaskCompletionStates: [Bool]
     let sequenceNumber: Int?
 
+    @State private var numberColumnWidth: CGFloat = 0
     @State private var text: String
     @State private var originalText: String
     @State private var isEditingMode = false
@@ -90,8 +108,9 @@ struct TaskRowView: View {
                 isCompleting: isCompleting,
                 action: beginCompletion
             )
+            .offset(y: -3)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Group {
                     if isEditingMode {
                         TaskTextEditor(
@@ -118,6 +137,15 @@ struct TaskRowView: View {
                                     .monospacedDigit()
                                     .foregroundStyle(.secondary)
                                     .fixedSize()
+                                    .background {
+                                        GeometryReader { geometry in
+                                            Color.clear
+                                                .onAppear { numberColumnWidth = geometry.size.width }
+                                                .onChange(of: geometry.size.width) { _, width in
+                                                    numberColumnWidth = width
+                                                }
+                                        }
+                                    }
                             }
                             Text(text)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -148,11 +176,12 @@ struct TaskRowView: View {
 
                 if !isEditingMode {
                     subtaskProgressLine
+                        .padding(.leading, numberColumnWidth)
                     reminderStatusLine
                         .transition(.opacity)
                 }
             }
-            .padding(.vertical, 5)
+            .padding(.vertical, 2)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .opacity(isCompleting ? 0.66 : 1)
@@ -191,7 +220,7 @@ struct TaskRowView: View {
         }
         .padding(.leading, CGFloat(indentationLevel) * 21 + 8)
         .padding(.trailing, 8)
-        .padding(.vertical, 3)
+        .padding(.vertical, 1)
         .background(
             isSelected && !isEditingMode ? Color.primary.opacity(0.055) : .clear,
             in: RoundedRectangle(cornerRadius: 9)
@@ -269,9 +298,6 @@ struct TaskRowView: View {
         if !subtaskCompletionStates.isEmpty {
             Button(action: onToggleSubtasks) {
                 HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
-                        .frame(width: 10, height: 14)
                     LazyVGrid(
                         columns: [GridItem(.adaptive(minimum: 8, maximum: 8), spacing: 6)],
                         alignment: .leading,
@@ -325,7 +351,7 @@ struct TaskRowView: View {
         }
     }
 
-    private var textFontSize: CGFloat { 14 }
+    private var textFontSize: CGFloat { hasSubtasks ? 15 : 14 }
 
     private var textFontWeight: Font.Weight {
         hasSubtasks ? .semibold : .regular
