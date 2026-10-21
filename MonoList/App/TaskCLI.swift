@@ -153,20 +153,7 @@ enum TaskCLI {
     static func agentInstructions(bundleURL: URL, bundleID: String) -> String {
         let command = shellQuote(launcherURL(in: bundleURL).path)
         let edition = bundleID == "com.qingcheng.monolist.dev" ? "MonoList 开发版" : "MonoList 正式版"
-        return """
-        请通过本机 CLI 操作我的 \(edition)，仅执行我本次授权的操作。
-        CLI 入口：\(command)
-        先运行 \(command) help 查看完整命令，再运行 \(command) status 确认连接版本。
-        读取任务：\(command) list
-        JSON 参数通过标准输入传递，输出为 JSON；写入先读取当前 revision，再使用 apply。
-        支持任务增删改、排序、父子层级、完成恢复、提醒、设置及窗口操作。
-        不要直接修改任务数据库。清单发生冲突时重新读取，超时后先核对状态，不要盲目重试。
-        删除、清空、安装更新和修改开机启动设置须先取得我的明确授权，不能自行添加 confirm:true。
-        只使用我提供或授权读取的项目资料；这个接口本身不授权读取其他本地文件。
-        软件必须保持运行。接口不可用时请提示我打开对应 App，不要改用其他版本或直接改数据文件。
-
-        使用示例：读取我的 MonoList，结合我提供的项目资料整理未完成任务，先给我看建议。
-        """
+        return "请通过此 CLI 管理我的 \(edition)：\(command)。先运行 help 查看用法，按我接下来的要求操作。"
     }
 
     static let help = """
