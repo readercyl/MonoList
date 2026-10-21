@@ -20,7 +20,7 @@ struct TaskRowView: View {
     let canAddSubtask: Bool
     let onIndent: (() -> Bool)?
     let onOutdent: (() -> Bool)?
-    let subtaskProgressText: String?
+    let subtaskCompletionStates: [Bool]
     let sequenceNumber: Int?
 
     @State private var text: String
@@ -52,7 +52,7 @@ struct TaskRowView: View {
         canAddSubtask: Bool = false,
         onIndent: (() -> Bool)? = nil,
         onOutdent: (() -> Bool)? = nil,
-        subtaskProgressText: String? = nil,
+        subtaskCompletionStates: [Bool] = [],
         sequenceNumber: Int? = nil
     ) {
         self.item = item
@@ -74,7 +74,7 @@ struct TaskRowView: View {
         self.canAddSubtask = canAddSubtask
         self.onIndent = onIndent
         self.onOutdent = onOutdent
-        self.subtaskProgressText = subtaskProgressText
+        self.subtaskCompletionStates = subtaskCompletionStates
         self.sequenceNumber = sequenceNumber
         _text = State(initialValue: item.text)
         _originalText = State(initialValue: item.text)
@@ -85,12 +85,11 @@ struct TaskRowView: View {
             hierarchyControl
 
             TaskCompletionButton(
-                symbolSize: 18,
+                symbolSize: 14,
                 frameSize: 28,
                 isCompleting: isCompleting,
                 action: beginCompletion
             )
-            .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 4) {
                 Group {
@@ -115,7 +114,7 @@ struct TaskRowView: View {
                     } else {
                         HStack(alignment: .firstTextBaseline, spacing: 0) {
                             if let sequenceNumber {
-                                Text("\(sequenceNumber)、")
+                                Text("\(sequenceNumber)、 ")
                                     .monospacedDigit()
                                     .foregroundStyle(.secondary)
                                     .fixedSize()
@@ -261,20 +260,38 @@ struct TaskRowView: View {
         )
     }
 
+    private var subtaskProgressDescription: String {
+        "已完成 \(subtaskCompletionStates.filter { $0 }.count) 个，共 \(subtaskCompletionStates.count) 个"
+    }
+
     @ViewBuilder
     private var subtaskProgressLine: some View {
-        if let subtaskProgressText {
+        if !subtaskCompletionStates.isEmpty {
             Button(action: onToggleSubtasks) {
-                HStack(spacing: 4) {
+                HStack(alignment: .top, spacing: 6) {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .font(.system(size: 10, weight: .semibold))
-                    Text(subtaskProgressText)
-                        .font(.system(size: 11, weight: .regular))
+                        .frame(width: 10, height: 14)
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 8, maximum: 8), spacing: 6)],
+                        alignment: .leading,
+                        spacing: 6
+                    ) {
+                        ForEach(subtaskCompletionStates.indices, id: \.self) { index in
+                            Circle()
+                                .fill(subtaskCompletionStates[index] ? Color.secondary : .clear)
+                                .overlay { Circle().strokeBorder(Color.secondary, lineWidth: 1) }
+                                .frame(width: 6, height: 6)
+                                .frame(width: 8, height: 14)
+                        }
+                    }
                 }
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(isExpanded ? "收起子任务" : "展开子任务")
-            .accessibilityLabel(isExpanded ? "收起子任务，\(subtaskProgressText)" : "展开子任务，\(subtaskProgressText)")
+            .help(subtaskProgressDescription + (isExpanded ? "，点击收起子任务" : "，点击展开子任务"))
+            .accessibilityLabel(subtaskProgressDescription)
+            .accessibilityValue(isExpanded ? "已展开" : "已收起")
             .foregroundStyle(.secondary)
             .transition(.opacity)
         }

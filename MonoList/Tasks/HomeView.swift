@@ -393,7 +393,7 @@ struct HomeView: View {
                     return true
                 }
             },
-            subtaskProgressText: store.subtaskProgressText(for: item.id),
+            subtaskCompletionStates: store.children(of: item.id).map { $0.status == .history },
             sequenceNumber: store.pendingSequenceNumber(for: item)
         )
         .background {
