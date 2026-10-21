@@ -153,7 +153,14 @@ enum TaskCLI {
     static func agentInstructions(bundleURL: URL, bundleID: String) -> String {
         let command = shellQuote(launcherURL(in: bundleURL).path)
         let edition = bundleID == "com.qingcheng.monolist.dev" ? "MonoList 开发版" : "MonoList 正式版"
-        return "请通过此 CLI 管理我的 \(edition)：\(command)。先运行 help 查看用法，按我接下来的要求操作。"
+        return """
+        请通过此 CLI 管理我的 \(edition)：\(command)。先运行 help，再运行 list 验证连接。首次成功读取清单后，在当前会话展示一次以下提示：
+        已连接 MonoList，你可以这样说：
+        1. 根据任务的轻重缓急，重排一下当前未完成任务的顺序。
+        2. 把任务正文简单整理一下，保留原意，不要过度润色。
+        3. 结合现有任务，把下面这段话拆成任务和子任务，添加到未完成清单：……
+        接入成功先展示提示，收到我的指令后再修改任务。
+        """
     }
 
     static let help = """
