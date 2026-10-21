@@ -17,6 +17,10 @@ final class TaskExpansionState: ObservableObject {
     }
 }
 
+enum TaskRowLayout {
+    static let numberColumnWidth: CGFloat = 32
+}
+
 struct TaskRowView: View {
     let item: TaskItem
     let onSave: (String) -> Void
@@ -40,7 +44,6 @@ struct TaskRowView: View {
     let subtaskCompletionStates: [Bool]
     let sequenceNumber: Int?
 
-    @State private var numberColumnWidth: CGFloat = 0
     @State private var text: String
     @State private var originalText: String
     @State private var isEditingMode = false
@@ -137,15 +140,7 @@ struct TaskRowView: View {
                                     .monospacedDigit()
                                     .foregroundStyle(.secondary)
                                     .fixedSize()
-                                    .background {
-                                        GeometryReader { geometry in
-                                            Color.clear
-                                                .onAppear { numberColumnWidth = geometry.size.width }
-                                                .onChange(of: geometry.size.width) { _, width in
-                                                    numberColumnWidth = width
-                                                }
-                                        }
-                                    }
+                                    .frame(width: TaskRowLayout.numberColumnWidth, alignment: .leading)
                             }
                             Text(text)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -176,7 +171,7 @@ struct TaskRowView: View {
 
                 if !isEditingMode {
                     subtaskProgressLine
-                        .padding(.leading, numberColumnWidth)
+                        .padding(.leading, sequenceNumber == nil ? 0 : TaskRowLayout.numberColumnWidth)
                     reminderStatusLine
                         .transition(.opacity)
                 }

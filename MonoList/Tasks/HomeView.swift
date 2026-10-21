@@ -797,9 +797,7 @@ private struct HomeCompletedTaskRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
-            if indentationLevel > 0 {
-                Color.clear.frame(width: 20, height: 28)
-            }
+            Color.clear.frame(width: indentationLevel == 0 ? 0 : 20, height: 28)
 
             Button(action: onRestore) {
                 Image(systemName: "checkmark.circle.fill")
@@ -811,7 +809,14 @@ private struct HomeCompletedTaskRow: View {
             .help("恢复为未完成")
             .offset(y: -3)
 
-            Text(item.text)
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                Color.clear
+                    .frame(width: TaskRowLayout.numberColumnWidth, height: 1)
+                    .accessibilityHidden(true)
+                Text(item.text)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
                 .font(.system(size: hasSubtasks ? 15 : 14, weight: hasSubtasks ? .semibold : .regular))
                 .strikethrough()
                 .foregroundStyle(.secondary)
