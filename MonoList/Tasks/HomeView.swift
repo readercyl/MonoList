@@ -230,6 +230,7 @@ struct HomeView: View {
                 Image(systemName: "plus")
                     .font(.system(size: 15))
                     .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(HomeHeaderIconButtonStyle())
             .help("新增待办")
@@ -246,6 +247,7 @@ struct HomeView: View {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 15))
                     .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
@@ -259,6 +261,7 @@ struct HomeView: View {
                 Image(systemName: "gearshape")
                     .font(.system(size: 15))
                     .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(HomeHeaderIconButtonStyle())
             .help("设置")
@@ -744,6 +747,9 @@ private struct HomeHeaderIconButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .contentShape(Rectangle())
+            .background(configuration.isPressed ? Color.primary.opacity(0.08) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 6))
             .foregroundStyle(.primary)
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .opacity(configuration.isPressed ? 0.78 : 1)
@@ -806,8 +812,9 @@ private struct HomeCompletedTaskRow: View {
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TaskIconButtonStyle())
             .help("恢复为未完成")
             .offset(y: -3)
 
@@ -832,9 +839,10 @@ private struct HomeCompletedTaskRow: View {
                 Image(systemName: "trash")
                     .foregroundStyle(.tertiary)
                     .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
                     .opacity(isHovered ? 1 : 0)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TaskIconButtonStyle())
             .help("删除")
         }
         .padding(.leading, CGFloat(indentationLevel) * 21 + 8)

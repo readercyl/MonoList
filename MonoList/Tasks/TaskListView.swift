@@ -826,6 +826,7 @@ private struct PanelHeaderIconLabel: View {
             .font(.system(size: 14, weight: .regular))
             .foregroundStyle(.primary)
             .frame(width: 28, height: 28)
+            .contentShape(Rectangle())
     }
 }
 
@@ -834,6 +835,9 @@ private struct PanelHeaderIconButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .contentShape(Rectangle())
+            .background(configuration.isPressed ? Color.primary.opacity(0.08) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 6))
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .opacity(configuration.isPressed ? 0.78 : 1)
             .animation(
@@ -919,8 +923,9 @@ private struct PanelCompletedTaskRow: View {
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TaskIconButtonStyle())
             .offset(y: -3)
             HStack(alignment: .firstTextBaseline, spacing: 0) {
                 Text(item.text)
@@ -942,9 +947,10 @@ private struct PanelCompletedTaskRow: View {
                 Image(systemName: "trash")
                     .foregroundStyle(.tertiary)
                     .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
                     .opacity(isHovered ? 1 : 0)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TaskIconButtonStyle())
         }
         .padding(.leading, CGFloat(indentationLevel) * 21 + 8)
         .padding(.trailing, 8)

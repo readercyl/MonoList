@@ -177,13 +177,14 @@ struct TaskRowView: View {
                     Image(systemName: "plus")
                         .foregroundStyle(.secondary)
                         .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
                         .opacity(isHovered || isSelected ? 1 : 0)
                         .animation(
                             reduceMotion ? nil : .easeOut(duration: 0.16),
                             value: isHovered || isSelected
                         )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(TaskIconButtonStyle())
                 .help("添加子任务")
                 .offset(y: -3)
             }
@@ -192,13 +193,14 @@ struct TaskRowView: View {
                 Image(systemName: "trash")
                     .foregroundStyle(.secondary)
                     .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
                     .opacity(isHovered || isSelected ? 1 : 0)
                     .animation(
                         reduceMotion ? nil : .easeOut(duration: 0.16),
                         value: isHovered || isSelected
                     )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TaskIconButtonStyle())
             .help("删除")
             .offset(y: -3)
         }
@@ -433,12 +435,13 @@ struct TaskCompletionButton: View {
             .font(.system(size: symbolSize, weight: .regular))
             .foregroundStyle(.secondary)
             .frame(width: frameSize, height: frameSize)
+            .contentShape(Rectangle())
             .animation(
                 reduceMotion ? nil : .easeOut(duration: 0.16),
                 value: isCompleting
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(TaskIconButtonStyle())
         .disabled(isCompleting)
         .help(isCompleting ? "已完成" : "标记为完成")
         .accessibilityLabel(isCompleting ? "已完成" : "标记为完成")
@@ -701,4 +704,15 @@ private struct ReminderTimeDropdown: View {
 
     private static let maxVisibleItems = 8
     private static let rowHeight: CGFloat = 28
+}
+
+// Use the reserved rectangle for both icon hit testing and pressed feedback.
+struct TaskIconButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .contentShape(Rectangle())
+            .background(configuration.isPressed ? Color.primary.opacity(0.08) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 6))
+            .opacity(configuration.isPressed ? 0.78 : 1)
+    }
 }
