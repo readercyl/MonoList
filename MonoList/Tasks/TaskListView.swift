@@ -294,6 +294,27 @@ struct TaskListView: View {
             if roots.isEmpty && !(draftState.isPresented && draftState.parentID == nil && draftState.group == group) {
                 Text("还没有任务").font(.system(size: 12)).foregroundStyle(.secondary)
                     .padding(.horizontal, 10).padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .overlay(alignment: .bottom) {
+                        if dropCoordinator.target == TaskDropTarget(group: group, beforeID: nil) {
+                            PanelTaskDragInsertionIndicator()
+                        }
+                    }
+                    .onDrop(
+                        of: [UTType.text],
+                        delegate: PanelTaskDropDelegate(
+                            group: group,
+                            parentID: nil,
+                            upperBeforeID: nil,
+                            lowerBeforeID: nil,
+                            rowHeight: 32,
+                            sessionID: dropCoordinator.sessionID,
+                            store: store,
+                            coordinator: dropCoordinator,
+                            errorMessage: $errorMessage
+                        )
+                    )
             }
             ForEach(roots) { root in
                 taskTree(for: root)

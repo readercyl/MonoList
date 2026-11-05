@@ -63,6 +63,19 @@ struct TaskDropCoordinatorSmoke {
         let reloaded = TaskStore(fileURL: directory.appendingPathComponent("tasks.json"))
         precondition(reloaded.pendingTasks.map(\.id) == store.pendingTasks.map(\.id))
         precondition(reloaded.tasks.first { $0.id == first.id }?.text == "第一条")
+        // Empty groups accept a root and preserve its children across reload.
+        let groupStore = TaskStore(fileURL: directory.appendingPathComponent("groups.json"))
+        let root = try groupStore.add(text: "父任务")
+        let subtask = try groupStore.add(text: "子任务", parentID: root.id)
+        for group in [TaskGroup.longTerm, .shortTerm] {
+            precondition(groupStore.topLevelPendingTasks(in: group).isEmpty)
+            let current = groupStore.tasks.first { $0.id == root.id }!
+            let groupSession = coordinator.beginDragging(task: current)
+            coordinator.hover(group: group, before: nil, sessionID: groupSession)
+            try coordinator.performDrop(sourceID: root.id, store: groupStore)
+            let saved = TaskStore(fileURL: directory.appendingPathComponent("groups.json"))
+            precondition(Set(saved.pendingTasks.filter { $0.group == group }.map(\.id)) == Set([root.id, subtask.id]))
+        }
         print("Task drop coordinator smoke passed.")
     }
 }

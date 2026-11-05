@@ -299,6 +299,27 @@ struct HomeView: View {
             if roots.isEmpty && !(draftState.isPresented && draftState.parentID == nil && draftState.group == group) {
                 Text("还没有任务").font(.system(size: 13)).foregroundStyle(.secondary)
                     .padding(.horizontal, 8).padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .overlay(alignment: .bottom) {
+                        if dropCoordinator.target == TaskDropTarget(group: group, beforeID: nil) {
+                            HomeTaskDragInsertionIndicator()
+                        }
+                    }
+                    .onDrop(
+                        of: [UTType.text],
+                        delegate: HomeTaskDropDelegate(
+                            group: group,
+                            parentID: nil,
+                            upperBeforeID: nil,
+                            lowerBeforeID: nil,
+                            rowHeight: 32,
+                            sessionID: dropCoordinator.sessionID,
+                            store: store,
+                            coordinator: dropCoordinator,
+                            errorMessage: $errorMessage
+                        )
+                    )
             }
             ForEach(roots) { root in
                 taskTree(for: root)
