@@ -10,8 +10,8 @@ SETTINGS="$ROOT_DIR/MonoList/Settings/SettingsView.swift"
 APP_SETTINGS="$ROOT_DIR/MonoList/Settings/AppSettings.swift"
 
 for source in "$TASK_LIST" "$HOME_VIEW" "$TASK_ROW" "$WINDOW_COORDINATOR"; do
-  if grep -qE '今日专注|短期任务|长期任务|focusStore|focusSection|focusPicker' "$source"; then
-    echo "当前任务界面不能保留专注或短期/长期分类入口：$source" >&2
+  if grep -qE '今日专注|focusStore|focusSection|focusPicker' "$source"; then
+    echo "当前任务界面不能保留专注入口：$source" >&2
     exit 1
   fi
 done

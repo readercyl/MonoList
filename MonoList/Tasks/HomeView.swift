@@ -281,38 +281,32 @@ struct HomeView: View {
     }
 
     private var pendingSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            pendingGroup(.shortTerm, title: "短期任务")
+            pendingGroup(.longTerm, title: "长期任务")
+        }
+    }
+
+    private func pendingGroup(_ group: TaskGroup, title: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
-                Text("未完成")
-                    .font(.system(size: 12, weight: .semibold))
-                Text("\(store.pendingTasks.count)")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.tertiary)
+                Text(title).font(.system(size: 12, weight: .semibold))
+                Text("\(store.pendingTasks.filter { $0.group == group }.count)")
+                    .font(.system(size: 10, weight: .medium)).foregroundStyle(.tertiary)
                 Spacer()
+            }.padding(.horizontal, 8)
+            let roots = store.topLevelPendingTasks(in: group)
+            if roots.isEmpty && !(draftState.isPresented && draftState.parentID == nil && draftState.group == group) {
+                Text("还没有任务").font(.system(size: 13)).foregroundStyle(.secondary)
+                    .padding(.horizontal, 8).padding(.vertical, 6)
             }
-            .padding(.horizontal, 8)
-
-            let roots = store.topLevelPendingTasks
-            if roots.isEmpty && !(draftState.isPresented && draftState.parentID == nil) {
-                Text("还没有任务")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-            }
-
             ForEach(roots) { root in
                 taskTree(for: root)
-                if draftState.isPresented,
-                   draftState.parentID == nil,
-                   draftState.afterID == root.id {
+                if draftState.isPresented, draftState.parentID == nil, draftState.group == group, draftState.afterID == root.id {
                     draftRow(indentationLevel: 0)
                 }
             }
-
-            if draftState.isPresented,
-               draftState.parentID == nil,
-               draftState.afterID == nil {
+            if draftState.isPresented, draftState.parentID == nil, draftState.group == group, draftState.afterID == nil {
                 draftRow(indentationLevel: 0)
             }
         }
@@ -404,6 +398,9 @@ struct HomeView: View {
                     return true
                 }
             },
+            onMoveGroup: indentationLevel == 0 ? {
+                performAction { try store.move(id: item.id, to: item.group == .shortTerm ? .longTerm : .shortTerm, before: nil) }
+            } : nil,
             subtaskCompletionStates: store.children(of: item.id).map { $0.status == .history }
         )
         .background {
@@ -417,7 +414,7 @@ struct HomeView: View {
         }
         .overlay(alignment: .top) {
             if dropCoordinator.target == TaskDropTarget(
-                group: .shortTerm,
+                group: item.group,
                 beforeID: item.id,
                 parentID: dropParentID
             ) {
@@ -427,7 +424,7 @@ struct HomeView: View {
         .overlay(alignment: .bottom) {
             if dropLowerBeforeID == nil,
                dropCoordinator.target == TaskDropTarget(
-                   group: .shortTerm,
+                   group: item.group,
                    beforeID: nil,
                    parentID: dropParentID
                ) {
@@ -443,7 +440,7 @@ struct HomeView: View {
         .onDrop(
             of: [UTType.text],
             delegate: HomeTaskDropDelegate(
-                group: .shortTerm,
+                group: item.group,
                 parentID: dropParentID,
                 upperBeforeID: dropUpperBeforeID,
                 lowerBeforeID: dropLowerBeforeID,
@@ -547,7 +544,7 @@ struct HomeView: View {
 
     private func beginRootDraft() {
         commitDraft()
-        beginDraft(after: store.topLevelPendingTasks.last?.id, parentID: nil)
+        beginDraft(after: store.topLevelPendingTasks(in: .shortTerm).last?.id, parentID: nil)
     }
 
     private func beginSubtaskDraft(for parent: TaskItem) {
@@ -559,7 +556,7 @@ struct HomeView: View {
     private func beginDraft(after id: UUID?, parentID: UUID?) {
         selectedTaskID = nil
         editingTaskID = nil
-        draftState.present(after: id, in: .shortTerm, parentID: parentID)
+        draftState.present(after: id, in: store.pendingTasks.first(where: { $0.id == (parentID ?? id) })?.group ?? .shortTerm, parentID: parentID)
         draftRequestID = UUID()
         DispatchQueue.main.async { draftFocused = true }
     }
@@ -601,7 +598,7 @@ struct HomeView: View {
 
     private func indentDraft() -> Bool {
         guard draftState.parentID == nil else { return false }
-        let roots = store.topLevelPendingTasks
+        let roots = store.topLevelPendingTasks(in: draftState.group)
         guard let afterID = draftState.afterID,
               let index = roots.firstIndex(where: { $0.id == afterID }),
               index > 0 else {

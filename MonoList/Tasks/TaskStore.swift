@@ -79,7 +79,7 @@ final class TaskStore: ObservableObject {
     }
 
     private func pendingSiblings(of item: TaskItem) -> [TaskItem] {
-        pendingTasks.filter { $0.parentID == item.parentID }
+        pendingTasks.filter { $0.parentID == item.parentID && $0.group == item.group }
     }
 
     func nextPendingSiblingID(after item: TaskItem) -> UUID? {
@@ -205,7 +205,11 @@ final class TaskStore: ObservableObject {
             case "move":
                 if let offset = operation.offset { try staged.move(id: id(), by: offset) }
                 else {
-                    try staged.move(id: id(), to: .shortTerm,
+                    let taskID = try id()
+                    guard let task = staged.tasks.first(where: { $0.id == taskID }) else {
+                        throw TaskStoreError.missingTask
+                    }
+                    try staged.move(id: taskID, to: task.group,
                                     before: operation.beforeID, parentID: operation.parentID)
                 }
             case "reorder":
@@ -246,7 +250,7 @@ final class TaskStore: ObservableObject {
 
         let effectiveGroup = parentID.flatMap { parentID in
             tasks.first(where: { $0.id == parentID })?.group
-        } ?? .shortTerm
+        } ?? group
         try validateParentID(parentID, in: tasks)
 
         var candidate = tasks
@@ -323,6 +327,9 @@ final class TaskStore: ObservableObject {
         var updatedMovingItems = movingItems
         if let movedRootIndex = updatedMovingItems.firstIndex(where: { $0.id == id }) {
             updatedMovingItems[movedRootIndex].parentID = parentID
+            if let parentID, let parent = candidate.first(where: { $0.id == parentID }) {
+                for index in updatedMovingItems.indices { updatedMovingItems[index].group = parent.group }
+            }
             updatedMovingItems[movedRootIndex].updatedAt = date
         }
         let insertionIndex: Int
@@ -356,7 +363,7 @@ final class TaskStore: ObservableObject {
               item.parentID == nil else {
             return
         }
-        let roots = topLevelPendingTasks
+        let roots = topLevelPendingTasks(in: item.group)
         guard let index = roots.firstIndex(where: { $0.id == id }), index > 0 else {
             return
         }
@@ -557,7 +564,7 @@ final class TaskStore: ObservableObject {
             throw TaskStoreError.missingTask
         }
         var pending = pendingTasks
-        let siblings = pending.filter { $0.parentID == item.parentID }
+        let siblings = pending.filter { $0.parentID == item.parentID && $0.group == item.group }
         guard let sourceIndex = siblings.firstIndex(where: { $0.id == id }) else {
             throw TaskStoreError.missingTask
         }
@@ -623,7 +630,8 @@ final class TaskStore: ObservableObject {
                 .filter { $0.parentID == rootID }
                 .map(\.id)
         )
-        let movingItems = pending.filter { subtreeIDs.contains($0.id) }
+        var movingItems = pending.filter { subtreeIDs.contains($0.id) }
+        for index in movingItems.indices { movingItems[index].group = group }
         pending.removeAll { subtreeIDs.contains($0.id) }
         let insertionIndex = destinationRootID.flatMap { destinationRootID in
             pending.firstIndex(where: { $0.id == destinationRootID })
@@ -631,6 +639,7 @@ final class TaskStore: ObservableObject {
         pending.insert(contentsOf: movingItems, at: insertionIndex)
 
         var candidate = tasks.filter { $0.status != .pending }
+        for index in candidate.indices where candidate[index].id == rootID || candidate[index].parentID == rootID { candidate[index].group = group }
         candidate.append(contentsOf: pending)
         normalizePendingOrders(in: &candidate)
         try commit(candidate)
@@ -849,7 +858,7 @@ final class TaskStore: ObservableObject {
             let database = try decoder.decode(TaskDatabase.self, from: data)
             let loadedTasks = database.tasks
             try validateHierarchy(in: loadedTasks)
-            tasks = Self.normalizedUnifiedTasks(loadedTasks)
+            tasks = loadedTasks.sorted { Self.taskOrder($0, $1) }
             needsMigration = database.schemaVersion < TaskDatabase.currentSchemaVersion
             normalizePendingOrders(in: &tasks)
         } catch TaskDatabaseError.invalidSchemaVersion {

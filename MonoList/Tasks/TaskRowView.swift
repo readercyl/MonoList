@@ -41,6 +41,7 @@ struct TaskRowView: View {
     let canAddSubtask: Bool
     let onIndent: (() -> Bool)?
     let onOutdent: (() -> Bool)?
+    let onMoveGroup: (() -> Void)?
     let subtaskCompletionStates: [Bool]
 
     @State private var editToken = UUID()
@@ -73,6 +74,7 @@ struct TaskRowView: View {
         canAddSubtask: Bool = false,
         onIndent: (() -> Bool)? = nil,
         onOutdent: (() -> Bool)? = nil,
+        onMoveGroup: (() -> Void)? = nil,
         subtaskCompletionStates: [Bool] = []
     ) {
         self.item = item
@@ -94,6 +96,7 @@ struct TaskRowView: View {
         self.canAddSubtask = canAddSubtask
         self.onIndent = onIndent
         self.onOutdent = onOutdent
+        self.onMoveGroup = onMoveGroup
         self.subtaskCompletionStates = subtaskCompletionStates
         _text = State(initialValue: item.text)
         _originalText = State(initialValue: item.text)
@@ -256,6 +259,9 @@ struct TaskRowView: View {
                 Button("清除提醒") {
                     onUpdateReminder(nil)
                 }
+            }
+            if let onMoveGroup {
+                Button(item.group == .shortTerm ? "移到长期任务" : "移到短期任务", action: onMoveGroup)
             }
             Divider()
             Button("上移", action: onMoveUp)

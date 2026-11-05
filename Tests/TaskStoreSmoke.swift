@@ -29,6 +29,7 @@ struct TaskStoreSmoke {
         try testExplicitReorderPersists()
         try testLegacyTasksDefaultToShortTerm()
         try testLegacyGroupsMergeIntoUnifiedOrder()
+        try testGroupMoveAndReload()
         try testStableHistoryOrder()
         try testTodayAndOlderCompletedTasks()
         try testOneTimeReminderPersistsAndClears()
@@ -248,14 +249,31 @@ struct TaskStoreSmoke {
         try data.write(to: fixture.fileURL)
         let store = TaskStore(fileURL: fixture.fileURL)
         try require(
-            store.pendingTasks.map(\.text) == ["旧短期", "旧长期"],
-            "旧分组任务没有合并为统一顺序"
+            Set(store.pendingTasks.map(\.text)) == Set(["旧短期", "旧长期"]),
+            "旧分组任务没有全部保留"
         )
-        try require(store.pendingTasks.allSatisfy { $0.group == .shortTerm },
-                    "旧分组字段没有降级为兼容值")
+        try require(store.shortTermTasks.map(\.id) == [shortID] && store.longTermTasks.map(\.id) == [longID],
+                    "旧分组字段没有保留")
         let appended = try store.add(text: "新任务")
         try require(store.pendingTasks.map(\.id).last == appended.id,
                     "统一列表新增任务没有追加到末尾")
+    }
+
+    @MainActor
+    private static func testGroupMoveAndReload() throws {
+        let fixture = try Fixture()
+        let store = TaskStore(fileURL: fixture.fileURL)
+        let parent = try store.add(text: "父任务")
+        let child = try store.add(text: "子任务", parentID: parent.id)
+        try store.move(id: parent.id, to: .longTerm, before: nil)
+        let reloaded = TaskStore(fileURL: fixture.fileURL)
+        try require(Set(reloaded.longTermTasks.map(\.id)) == Set([parent.id, child.id]),
+                    "移动分组后父子任务或重载结果不一致")
+        try reloaded.complete(id: child.id)
+        try require(reloaded.pendingTasks.isEmpty, "最后一个子任务完成后父任务未完成")
+        try reloaded.restore(id: child.id)
+        try require(Set(reloaded.longTermTasks.map(\.id)) == Set([parent.id, child.id]),
+                    "恢复子任务后父子任务分组不一致")
     }
 
     @MainActor
