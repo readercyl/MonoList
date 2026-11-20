@@ -115,6 +115,13 @@ struct TaskListView: View {
             commitDraft()
             removeKeyboardMonitor()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .monoListMainPanelDidClose)) { _ in
+            // 面板只是 orderOut，视图仍在：不重置会让 CLI 一直看到 editor_busy
+            editingTaskID = nil
+            selectedTaskID = nil
+            TaskExpansionState.shared.activeEditors.removeAll()
+            removeKeyboardMonitor()
+        }
         .onChange(of: preferredHeight) { _, height in
             onHeightChanged(height)
         }
@@ -720,7 +727,9 @@ struct TaskListView: View {
     private func installKeyboardMonitor() {
         guard keyboardMonitor == nil else { return }
         keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            guard editingTaskID == nil, !draftFocused, let selectedTaskID else {
+            // 只在菜单栏面板（NSPanel）里生效，避免主窗口里按 Delete 误删面板遗留的选中项
+            guard event.window is NSPanel,
+                  editingTaskID == nil, !draftFocused, let selectedTaskID else {
                 return event
             }
             if event.keyCode == 51 || event.keyCode == 117 {

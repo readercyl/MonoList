@@ -22,7 +22,7 @@ final class ReminderScheduler: ObservableObject {
     init(
         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         wallClock: @escaping () -> Date = { Date() },
-        calendar: Calendar = .current,
+        calendar: Calendar = .autoupdatingCurrent,
         onDue: @escaping () -> Void,
         onDedicatedReminderDue: @escaping (UUID) -> Void = { _ in }
     ) {
@@ -218,7 +218,7 @@ final class ReminderScheduler: ObservableObject {
         intervalMinutes: Int,
         startMinuteOfDay: Int,
         endMinuteOfDay: Int,
-        calendar: Calendar = .current
+        calendar: Calendar = .autoupdatingCurrent
     ) -> Date {
         let candidate = date.addingTimeInterval(TimeInterval(intervalMinutes * 60))
         let candidateStart = boundaryDate(
@@ -252,7 +252,7 @@ final class ReminderScheduler: ObservableObject {
     static func dueDedicatedReminderTask(
         in tasks: [TaskItem],
         at date: Date,
-        calendar: Calendar = .current
+        calendar: Calendar = .autoupdatingCurrent
     ) -> TaskItem? {
         dueDedicatedReminderTasks(in: tasks, at: date, calendar: calendar).first
     }
@@ -260,7 +260,7 @@ final class ReminderScheduler: ObservableObject {
     static func dueDedicatedReminderTasks(
         in tasks: [TaskItem],
         at date: Date,
-        calendar: Calendar = .current
+        calendar: Calendar = .autoupdatingCurrent
     ) -> [TaskItem] {
         tasks
             .filter { $0.status == .pending }
@@ -300,7 +300,7 @@ final class ReminderScheduler: ObservableObject {
     static func dedicatedReminderDate(
         for task: TaskItem,
         on date: Date,
-        calendar: Calendar = .current
+        calendar: Calendar = .autoupdatingCurrent
     ) -> Date? {
         guard let reminder = task.reminder else { return nil }
         switch reminder.kind {

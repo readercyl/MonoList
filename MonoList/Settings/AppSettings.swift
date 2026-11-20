@@ -251,10 +251,15 @@ final class AppSettings: ObservableObject {
             decoder.dateDecodingStrategy = .iso8601
             let database = try decoder.decode(SettingsDatabase.self, from: data)
             guard database.schemaVersion == SettingsDatabase.currentSchemaVersion else {
-                throw CocoaError(.coderInvalidValue)
+                // 未来版本写下的文件不能丢也不能降级覆盖，保持只读并提示
+                loadError = CocoaError(.featureUnsupported)
+                return
             }
             var loadedValues = database.values
             loadedValues.reminderPosition = loadedValues.reminderPosition.supportedValue
+            if ![30, 60, 90, 120].contains(loadedValues.reminderIntervalMinutes) {
+                loadedValues.reminderIntervalMinutes = 60
+            }
             if !Self.isValidReminderTimeRange(
                 startMinuteOfDay: loadedValues.reminderStartMinuteOfDay,
                 endMinuteOfDay: loadedValues.reminderEndMinuteOfDay
@@ -264,7 +269,12 @@ final class AppSettings: ObservableObject {
             }
             values = loadedValues
         } catch {
-            loadError = error
+            // 坏文件改名留档后回落默认值：否则所有写入都会被 recoveryRequired 挡住，用户没有任何修复入口。
+            let backupURL = fileURL.deletingPathExtension()
+                .appendingPathExtension("corrupt-\(Int(Date().timeIntervalSince1970)).json")
+            try? FileManager.default.moveItem(at: fileURL, to: backupURL)
+            values = SettingsValues()
+            loadError = nil
         }
     }
 

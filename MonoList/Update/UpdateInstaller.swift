@@ -42,7 +42,13 @@ final class UpdateInstaller {
 
         let dmgURL = try await download(update)
         do {
-            try validateDMG(dmgURL, version: update.version, currentAppURL: appURL)
+            try await Task.detached(priority: .userInitiated) {
+                try UpdateInstaller.validateDMG(
+                    dmgURL,
+                    version: update.version,
+                    currentAppURL: appURL
+                )
+            }.value
             let scriptURL = FileManager.default.temporaryDirectory
                 .appendingPathComponent("monolist-updater-\(UUID().uuidString).sh")
             try Self.updaterScript.write(
@@ -110,7 +116,8 @@ final class UpdateInstaller {
         return destination
     }
 
-    private func validateDMG(
+    /// 校验要跑 hdiutil / codesign，放到后台执行，避免主线程卡住数秒。
+    nonisolated static func validateDMG(
         _ dmgURL: URL,
         version: String,
         currentAppURL: URL
@@ -141,7 +148,7 @@ final class UpdateInstaller {
         )
     }
 
-    private static func validateApp(
+    private nonisolated static func validateApp(
         _ appURL: URL,
         version: String,
         currentAppURL: URL
@@ -171,7 +178,7 @@ final class UpdateInstaller {
         }
     }
 
-    private static func normalizedRequirement(_ value: String) -> String {
+    private nonisolated static func normalizedRequirement(_ value: String) -> String {
         value
             .split(separator: "\n")
             .last
@@ -180,7 +187,7 @@ final class UpdateInstaller {
     }
 
     @discardableResult
-    private static func output(_ executable: String, _ arguments: [String]) throws -> String {
+    private nonisolated static func output(_ executable: String, _ arguments: [String]) throws -> String {
         let process = Process()
         let pipe = Pipe()
         process.executableURL = URL(fileURLWithPath: executable)
@@ -198,7 +205,7 @@ final class UpdateInstaller {
         ) ?? ""
     }
 
-    private static func run(_ executable: String, _ arguments: [String]) throws {
+    private nonisolated static func run(_ executable: String, _ arguments: [String]) throws {
         _ = try output(executable, arguments)
     }
 
@@ -245,6 +252,10 @@ final class UpdateInstaller {
 
     fail() {
       restore_old_app
+      # 还没替换 App 就失败时，旧 App 仍在原位，直接重新打开，否则用户只看到应用消失
+      if [[ -d "$APP_PATH" ]]; then
+        open "$APP_PATH" >/dev/null 2>&1 || true
+      fi
       cleanup
       exit 1
     }

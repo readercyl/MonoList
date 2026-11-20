@@ -27,7 +27,9 @@ final class WindowCoordinator {
     }
 
     static func isStatusItemClick(_ point: NSPoint, frame: NSRect?) -> Bool {
-        frame?.insetBy(dx: -2, dy: -2).contains(point) == true
+        // 位置还没上报时不能判成外部点击，否则点了图标刚开的面板会被立刻关掉
+        guard let frame else { return true }
+        return frame.insetBy(dx: -2, dy: -2).contains(point)
     }
 
     static func shouldCloseMainPanel(
@@ -259,6 +261,8 @@ final class WindowCoordinator {
         if draftState.isPresented {
             try? draftState.commitOrDismiss(to: taskStore)
         }
+        // 面板只 orderOut，SwiftUI 视图不会销毁，需要显式通知它退出编辑态
+        NotificationCenter.default.post(name: .monoListMainPanelDidClose, object: nil)
         pendingResizeWorkItem?.cancel()
         pendingResizeWorkItem = nil
         mainPanelResizeTimer?.invalidate()
@@ -282,6 +286,12 @@ final class WindowCoordinator {
            !previousApplication.isTerminated {
             previousApplication.activate(options: [])
         }
+    }
+
+    /// 退出（菜单退出、CLI 退出、自动升级）前把草稿落盘。
+    func commitPendingDraft() {
+        guard draftState.isPresented else { return }
+        try? draftState.commitOrDismiss(to: taskStore)
     }
 
     func hideWindowsForCLI() {

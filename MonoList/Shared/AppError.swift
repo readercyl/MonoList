@@ -10,3 +10,8 @@ enum AppError: LocalizedError {
         }
     }
 }
+
+extension Notification.Name {
+    /// 菜单栏主面板关闭后广播，供视图结束行内编辑并释放键盘监视器。
+    static let monoListMainPanelDidClose = Notification.Name("MonoList.mainPanelDidClose")
+}

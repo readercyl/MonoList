@@ -19,9 +19,28 @@ struct AtomicFileWriter: AtomicWriting {
         )
 
         do {
-            try data.write(to: temporaryURL)
+            // 先落盘再改名：否则崩溃/断电会留下 0 字节的正式文件，而旧内容已被覆盖。
+            guard fileManager.createFile(
+                atPath: temporaryURL.path,
+                contents: data,
+                attributes: [.posixPermissions: 0o600]
+            ) else {
+                throw POSIXError(.EIO)
+            }
+            let handle = try FileHandle(forWritingTo: URL(fileURLWithPath: temporaryURL.path))
+            try handle.synchronize()
+            try handle.close()
+            try fileManager.setAttributes(
+                [.posixPermissions: 0o600],
+                ofItemAtPath: temporaryURL.path
+            )
             guard Darwin.rename(temporaryURL.path, destinationURL.path) == 0 else {
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+            let directoryFD = Darwin.open(directoryURL.path, O_RDONLY)
+            if directoryFD >= 0 {
+                fsync(directoryFD)
+                close(directoryFD)
             }
         } catch {
             try? fileManager.removeItem(at: temporaryURL)

@@ -54,10 +54,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         if isDevelopmentBuild {
             if isolatedPath == nil { loginController.removeDevelopmentRegistration() }
-        } else if
-            settings.launchAtLogin && loginController.status != .enabled {
-            try? loginController.setEnabled(true)
         }
+        // 正式版启动时只读取登录项状态；用户在系统设置里关掉后不再自动重新注册。
         try? store.refreshDailyReminderTasks()
         let reminderPanelController = ReminderPanelController()
         let scheduler = ReminderScheduler(
@@ -186,7 +184,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         dailyReminderRefreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) {
             [weak self, weak store] _ in
             Task { @MainActor in
-                try? store?.refreshDailyReminderTasks()
+                do {
+                    try store?.refreshDailyReminderTasks()
+                } catch {
+                    NSLog("MonoList daily reminder refresh failed: %@", error.localizedDescription)
+                }
                 if let store {
                     Self.postMenuBarStatus(
                         Self.menuBarStatus(tasks: store.tasks)
@@ -478,6 +480,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // 未回车的草稿行只在内存里，退出前补一次落盘
+        windowCoordinator?.commitPendingDraft()
         updateCheckTimer?.invalidate()
         dailyReminderRefreshTimer?.invalidate()
         menuBarHelperApplication?.terminate()
@@ -632,6 +636,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = false
         configuration.addsToRecentItems = false
+        configuration.createsNewApplicationInstance = true
         configuration.arguments = [
             String(ProcessInfo.processInfo.processIdentifier),
             String(status.pendingCount),
@@ -657,7 +662,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func applyMenuBarVisibility(_ showsInMenuBar: Bool) {
         if showsInMenuBar {
             guard let store = taskStore else { return }
-            launchMenuBarHelper(status: Self.menuBarStatus(tasks: store.tasks))
+            // helper 退出是异步的，稍等再拉起，避免同时出现两个图标
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                self?.launchMenuBarHelper(status: Self.menuBarStatus(tasks: store.tasks))
+            }
         } else {
             menuBarHelperApplication?.terminate()
             menuBarHelperApplication = nil
@@ -672,7 +681,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               settings.automaticUpdatesEnabled else {
             return
         }
-        await installUpdate(update, offersRetry: false)
+        // 自动检查只提示有新版本，安装交给用户触发，避免打断正在输入的编辑
+        NSLog("MonoList automatic update available: %@", update.version)
     }
 
     private func installUpdate(
