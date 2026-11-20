@@ -747,7 +747,18 @@ final class TaskStore: ObservableObject {
         } else {
             idsToDelete = [item.id]
         }
-        // 删除历史副本只删除被选中的条目；同一循环链上仍存活的副本保留自己的提醒。
+        // 删掉当前待办副本 = 停止这条每日提醒；删掉已完成的历史副本不影响仍在用的提醒链。
+        let recurrenceIDs = Set(
+            candidate
+                .filter { idsToDelete.contains($0.id) && $0.completedAt == nil }
+                .compactMap { $0.reminder?.recurrenceID }
+        )
+        if !recurrenceIDs.isEmpty {
+            for index in candidate.indices
+            where candidate[index].reminder?.recurrenceID.map(recurrenceIDs.contains) == true {
+                candidate[index].reminder = nil
+            }
+        }
         candidate.removeAll { idsToDelete.contains($0.id) }
         normalizePendingOrders(in: &candidate)
         try commit(candidate)

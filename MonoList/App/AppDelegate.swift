@@ -681,8 +681,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               settings.automaticUpdatesEnabled else {
             return
         }
-        // 自动检查只提示有新版本，安装交给用户触发，避免打断正在输入的编辑
-        NSLog("MonoList automatic update available: %@", update.version)
+        // 正在编辑时不打断用户，等他自己点升级
+        guard TaskExpansionState.shared.activeEditors.isEmpty else {
+            NSLog("MonoList auto update deferred: editor active")
+            return
+        }
+        await installUpdate(update, offersRetry: false)
     }
 
     private func installUpdate(
