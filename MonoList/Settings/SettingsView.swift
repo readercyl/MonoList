@@ -605,7 +605,7 @@ private struct UpdatePillButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: 13, weight: .medium))
             .padding(.horizontal, 12)
-            .frame(height: 24)
+            .frame(height: 22)
             .background(
                 configuration.isPressed ? Color.black.opacity(0.06) : Color.white,
                 in: Capsule()
