@@ -66,6 +66,7 @@ struct SettingsValues: Codable, Equatable {
     var reminderSoundName = "Glass"
     var automaticUpdatesEnabled = true
     var launchAtLogin = false
+    var showsInDock = true
     var globalShortcut: ShortcutDefinition?
     var lastAutomaticUpdateCheckAt: Date?
 
@@ -81,6 +82,7 @@ struct SettingsValues: Codable, Equatable {
         case reminderSoundName
         case automaticUpdatesEnabled
         case launchAtLogin
+        case showsInDock
         case globalShortcut
         case lastAutomaticUpdateCheckAt
     }
@@ -123,6 +125,7 @@ struct SettingsValues: Codable, Equatable {
             Bool.self,
             forKey: .launchAtLogin
         ) ?? false
+        showsInDock = try container.decodeIfPresent(Bool.self, forKey: .showsInDock) ?? true
         globalShortcut = try container.decodeIfPresent(
             ShortcutDefinition.self,
             forKey: .globalShortcut

@@ -104,6 +104,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.updateInstaller = updateInstaller
         windowCoordinator = coordinator
         installMenuBarObservers()
+        settings.$values
+            .map(\.showsInDock)
+            .removeDuplicates()
+            .sink { showsInDock in
+                NSApp.setActivationPolicy(showsInDock ? .regular : .accessory)
+            }
+            .store(in: &cancellables)
         if isolatedPath == nil { showHomeForInteractiveLaunch() }
         let initialMenuBarStatus = Self.menuBarStatus(tasks: store.tasks)
         if isolatedPath == nil { launchMenuBarHelper(status: initialMenuBarStatus) }
@@ -233,7 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 let fields: Set<String> = ["reminderEnabled", "reminderIntervalMinutes",
                     "reminderStartMinuteOfDay", "reminderEndMinuteOfDay", "reminderPosition",
-                    "reminderSoundEnabled", "reminderSoundName", "automaticUpdatesEnabled"]
+                    "reminderSoundEnabled", "reminderSoundName", "automaticUpdatesEnabled", "showsInDock"]
                 guard Set(patch.keys).isSubset(of: fields), !patch.values.contains(where: { $0 is NSNull }) else {
                     throw TaskCLIError.message("未知或只读设置；开机启动请用 login.set")
                 }

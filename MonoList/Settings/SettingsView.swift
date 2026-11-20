@@ -336,6 +336,17 @@ struct SettingsView: View {
                 .labelsHidden()
                 .toggleStyle(SettingsSwitchStyle())
             }
+            settingsRow("在 Dock 中显示") {
+                Toggle(
+                    "在 Dock 中显示",
+                    isOn: binding(
+                        get: { settings.values.showsInDock },
+                        update: { $0.showsInDock = $1 }
+                    )
+                )
+                .labelsHidden()
+                .toggleStyle(SettingsSwitchStyle())
+            }
             settingsRow("开机后自动启动") {
                 if loginItemController.isDevelopmentBuild {
                     Text("由正式版管理")

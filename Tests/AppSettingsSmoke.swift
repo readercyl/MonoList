@@ -18,6 +18,7 @@ struct AppSettingsSmoke {
         precondition(settings.reminderSoundName == "Glass")
         precondition(settings.automaticUpdatesEnabled)
         precondition(!settings.launchAtLogin)
+        precondition(settings.values.showsInDock)
         precondition(settings.globalShortcut == nil)
         precondition(ReminderPosition.supportedCases == [.topCenter, .topRight])
         precondition(ReminderPosition.center.supportedValue == .topCenter)
@@ -32,6 +33,7 @@ struct AppSettingsSmoke {
             $0.reminderSoundEnabled = false
             $0.reminderSoundName = "Ping"
             $0.automaticUpdatesEnabled = false
+            $0.showsInDock = false
             $0.globalShortcut = ShortcutDefinition(keyCode: 40, modifiers: 1 << 20)
         }
 
@@ -44,6 +46,7 @@ struct AppSettingsSmoke {
         precondition(!reloaded.reminderSoundEnabled)
         precondition(reloaded.reminderSoundName == "Ping")
         precondition(!reloaded.automaticUpdatesEnabled)
+        precondition(!reloaded.values.showsInDock)
         precondition(reloaded.globalShortcut?.keyCode == 40)
 
         do {
@@ -81,6 +84,7 @@ struct AppSettingsSmoke {
         precondition(legacy.reminderSoundName == "Glass")
         precondition(legacy.automaticUpdatesEnabled)
         precondition(legacy.launchAtLogin)
+        precondition(legacy.values.showsInDock)
 
         let original = Data(#"{"schemaVersion":99,"values":{}}"#.utf8)
         let unknownURL = directory.appendingPathComponent("unknown.json")
