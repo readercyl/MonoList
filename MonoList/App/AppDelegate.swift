@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarHelperApplication: NSRunningApplication?
     private var menuBarObservers: [NSObjectProtocol] = []
     private var cancellables = Set<AnyCancellable>()
+    private var launchedAsLoginItem = false
 
     private var isDevelopmentBuild: Bool {
         Bundle.main.bundleIdentifier == "com.qingcheng.monolist.dev"
@@ -36,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        launchedAsLoginItem = Self.isLoginItemLaunch()
         let isolatedPath = TaskCLI.isolatedDirectory(bundleID: Bundle.main.bundleIdentifier ?? "")
         let applicationSupportURL = isolatedPath.map { URL(fileURLWithPath: $0) } ?? FileManager.default.urls(
             for: .applicationSupportDirectory,
@@ -351,13 +353,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showHomeForInteractiveLaunch() {
+        // 开机自启静默启动；用户主动启动（访达双击、open、被其他进程唤起）时显示主窗口。
+        guard !launchedAsLoginItem else { return }
         DispatchQueue.main.async { [weak self] in
-            let currentProcessID = ProcessInfo.processInfo.processIdentifier
-            let isFrontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier ==
-                currentProcessID
-            guard NSApp.isActive || isFrontmost else { return }
+            // 有关闭 Dock 时应用不会成为前台，前台判断必然失败，改由登录项标记区分。
+            if NSApp.activationPolicy() == .regular {
+                let currentProcessID = ProcessInfo.processInfo.processIdentifier
+                let isFrontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier ==
+                    currentProcessID
+                guard NSApp.isActive || isFrontmost else { return }
+            }
             self?.windowCoordinator?.showHome()
         }
+    }
+
+    /// 读取 open application 事件里的 keyAELaunchedAsLogInItem 标记。
+    private static func isLoginItemLaunch() -> Bool {
+        guard let event = NSAppleEventManager.shared().currentAppleEvent,
+              event.eventClass == AEEventClass(kCoreEventClass),
+              event.eventID == AEEventID(kAEOpenApplication),
+              let properties = event.paramDescriptor(forKeyword: keyAEPropData) else {
+            return false
+        }
+        return properties.enumCodeValue == keyAELaunchedAsLogInItem
     }
 
     func applicationWillTerminate(_ notification: Notification) {
