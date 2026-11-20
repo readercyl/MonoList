@@ -107,8 +107,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.$values
             .map(\.showsInDock)
             .removeDuplicates()
-            .sink { showsInDock in
-                NSApp.setActivationPolicy(showsInDock ? .regular : .accessory)
+            .sink { [weak coordinator] showsInDock in
+                coordinator?.applyDockVisibility(showsInDock)
             }
             .store(in: &cancellables)
         if isolatedPath == nil { showHomeForInteractiveLaunch() }

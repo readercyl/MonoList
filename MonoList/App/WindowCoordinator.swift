@@ -289,6 +289,27 @@ final class WindowCoordinator {
         homeWindow?.orderOut(nil)
     }
 
+    func applyDockVisibility(_ showsInDock: Bool) {
+        let policy: NSApplication.ActivationPolicy = showsInDock ? .regular : .accessory
+        guard NSApp.activationPolicy() != policy else { return }
+        let focusedWindow = NSApp.isActive && homeWindow?.isKeyWindow == true ? homeWindow : nil
+        guard NSApp.setActivationPolicy(policy), let focusedWindow else { return }
+
+        // Keep the window in front while WindowServer settles the policy change.
+        focusedWindow.orderFrontRegardless()
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(150)) { [weak focusedWindow] in
+            guard let focusedWindow, focusedWindow.isVisible, !focusedWindow.isMiniaturized,
+                  NSApp.activationPolicy() == policy,
+                  NSApp.keyWindow == nil || NSApp.keyWindow === focusedWindow else { return }
+            focusedWindow.orderFrontRegardless()
+            focusedWindow.makeKey()
+            if !NSApp.isActive {
+                NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
+                NSApp.activate()
+            }
+        }
+    }
+
     func showSettings() {
         showHome(showSettings: true)
     }
