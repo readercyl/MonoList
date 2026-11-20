@@ -372,6 +372,10 @@ struct SettingsView: View {
                 .labelsHidden()
                 .toggleStyle(SettingsSwitchStyle())
             }
+            Text("重新启动后生效")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             settingsRow("开机自动启动") {
                 if loginItemController.isDevelopmentBuild {
                     Text("由正式版管理")
@@ -574,14 +578,14 @@ private struct InlineUpdateButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: 12, weight: .medium))
             .padding(.horizontal, 8)
-            .frame(height: 24)
+            .frame(height: 22)
             .background(
-                Color.primary.opacity(configuration.isPressed ? 0.10 : 0.055),
-                in: Capsule()
+                configuration.isPressed ? Color.black.opacity(0.05) : Color.white,
+                in: RoundedRectangle(cornerRadius: 6)
             )
             .overlay(
-                Capsule()
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
             )
     }
 }
@@ -698,12 +702,12 @@ private struct SettingValueBackground: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(
-                Color.primary.opacity(isPressed ? 0.10 : 0.045),
+                isPressed ? Color.black.opacity(0.05) : Color.white,
                 in: RoundedRectangle(cornerRadius: 6)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.primary.opacity(0.07), lineWidth: 0.5)
+                    .stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
             )
     }
 }
