@@ -129,12 +129,11 @@ struct SettingsView: View {
                         }
                     }
                     .buttonStyle(InlineUpdateButtonStyle())
-                    .frame(width: 88, height: 22)
                     .disabled(updater.isChecking)
 
                     if !updater.statusText.isEmpty {
                         Text(updater.statusText)
-                            .font(.system(size: 12))
+                            .font(.system(size: 13))
                             .foregroundStyle(updateStatusColor)
                             .lineLimit(1)
                     }
@@ -143,7 +142,6 @@ struct SettingsView: View {
                             onInstallUpdate(update)
                         }
                         .buttonStyle(InlineUpdateButtonStyle())
-                        .frame(width: 58, height: 22)
                         .disabled(updater.isInstalling)
                     }
                 }
@@ -227,7 +225,7 @@ struct SettingsView: View {
                     }
                     .frame(width: 78, height: SettingsStyle.controlHeight)
                     Text("至")
-                        .font(.system(size: 12))
+                        .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                     SettingsPopupButton(
                         items: Self.endTimeItems.map(Self.timeTitle),
@@ -265,7 +263,7 @@ struct SettingsView: View {
             }
             settingsRow("下次提醒") {
                 Text(nextReminderText)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(nextReminderColor)
                     .lineLimit(1)
                     .frame(
@@ -293,7 +291,7 @@ struct SettingsView: View {
             }
             settingsRow("提醒测试") {
                 Button("立即测试", action: onTestReminder)
-                    .buttonStyle(FixedQuietButtonStyle(width: SettingsStyle.controlWidth))
+                    .buttonStyle(FixedQuietButtonStyle())
             }
         }
     }
@@ -306,20 +304,20 @@ struct SettingsView: View {
     private var agentConnectionSettings: some View {
         VStack(alignment: .leading, spacing: SettingsStyle.rowSpacing) {
             Text("复制说明给支持本机命令的智能体。")
-                .font(.system(size: 12))
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             settingsRow("接入说明") {
                 Button(copiedCLIInstructions ? "已复制" : "复制给智能体") { copyCLIInstructions() }
-                    .buttonStyle(FixedQuietButtonStyle(width: SettingsStyle.controlWidth))
+                    .buttonStyle(FixedQuietButtonStyle())
             }
             settingsRow("命令与示例") {
                 Button("查看说明") { showsCLICommands = true }
-                    .buttonStyle(FixedQuietButtonStyle(width: SettingsStyle.controlWidth))
+                    .buttonStyle(FixedQuietButtonStyle())
             }
             settingsRow("接口状态") {
                 Button(checkingCLI ? "检测中…" : "检测接口") { checkCLIConnection() }
-                    .buttonStyle(FixedQuietButtonStyle(width: SettingsStyle.controlWidth))
+                    .buttonStyle(FixedQuietButtonStyle())
                     .disabled(checkingCLI)
             }
             Text(cliStatus)
@@ -379,7 +377,7 @@ struct SettingsView: View {
             settingsRow("开机自动启动") {
                 if loginItemController.isDevelopmentBuild {
                     Text("由正式版管理")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary)
                         .frame(width: SettingsStyle.controlWidth, height: SettingsStyle.controlHeight)
                         .modifier(SettingValueBackground())
@@ -576,8 +574,8 @@ private struct SettingsCard<Content: View>: View {
 private struct InlineUpdateButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12, weight: .medium))
-            .padding(.horizontal, 8)
+            .font(.system(size: 13, weight: .medium))
+            .padding(.horizontal, 10)
             .frame(height: 22)
             .background(
                 configuration.isPressed ? Color.black.opacity(0.05) : Color.white,
@@ -591,12 +589,11 @@ private struct InlineUpdateButtonStyle: ButtonStyle {
 }
 
 private struct FixedQuietButtonStyle: ButtonStyle {
-    let width: CGFloat
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 13, weight: .regular))
-            .frame(width: width, height: 26)
+            .font(.system(size: 13, weight: .medium))
+            .padding(.horizontal, 10)
+            .frame(height: 22)
             .modifier(SettingValueBackground(isPressed: configuration.isPressed))
     }
 }
