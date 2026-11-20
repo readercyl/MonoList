@@ -355,6 +355,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    func applicationDidResignActive(_ notification: Notification) {
+        windowCoordinator?.restoreDockSwitchFocus()
+    }
+
     private func showHomeForInteractiveLaunch() {
         DispatchQueue.main.async { [weak self] in
             let currentProcessID = ProcessInfo.processInfo.processIdentifier

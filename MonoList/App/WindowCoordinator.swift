@@ -59,6 +59,9 @@ final class WindowCoordinator {
     private var pendingResizeWorkItem: DispatchWorkItem?
     private weak var previousApplication: NSRunningApplication?
     private var homeWindow: NSWindow?
+    private weak var dockSwitchFocusWindow: NSWindow?
+    private var dockSwitchFocusDeadline: TimeInterval = 0
+    private var dockSwitchFocusAttempts = 0
     private let homePresentationState = HomePresentationState()
     private var settings: AppSettings?
     private var reminderScheduler: ReminderScheduler?
@@ -295,19 +298,28 @@ final class WindowCoordinator {
         let focusedWindow = NSApp.isActive && homeWindow?.isKeyWindow == true ? homeWindow : nil
         guard NSApp.setActivationPolicy(policy), let focusedWindow else { return }
 
-        // Keep the window in front while WindowServer settles the policy change.
+        // WindowServer 切换策略后还会再落一次失活（约 90ms），早于它的激活都会被吞掉，
+        // 固定延迟必然露出空窗。改为在失活回调里立刻抢回焦点。
         focusedWindow.orderFrontRegardless()
-        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(150)) { [weak focusedWindow] in
-            guard let focusedWindow, focusedWindow.isVisible, !focusedWindow.isMiniaturized,
-                  NSApp.activationPolicy() == policy,
-                  NSApp.keyWindow == nil || NSApp.keyWindow === focusedWindow else { return }
-            focusedWindow.orderFrontRegardless()
-            focusedWindow.makeKey()
-            if !NSApp.isActive {
-                NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
-                NSApp.activate()
-            }
+        dockSwitchFocusWindow = focusedWindow
+        dockSwitchFocusDeadline = ProcessInfo.processInfo.systemUptime + 0.6
+        dockSwitchFocusAttempts = 0
+    }
+
+    /// 由 AppDelegate 的 applicationDidResignActive 调用，只在 Dock 显示切换后的短时间内生效。
+    func restoreDockSwitchFocus() {
+        guard let focusedWindow = dockSwitchFocusWindow else { return }
+        guard ProcessInfo.processInfo.systemUptime < dockSwitchFocusDeadline,
+              dockSwitchFocusAttempts < 3,
+              focusedWindow.isVisible,
+              !focusedWindow.isMiniaturized else {
+            dockSwitchFocusWindow = nil
+            return
         }
+        dockSwitchFocusAttempts += 1
+        focusedWindow.makeKey()
+        NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
+        NSApp.activate()
     }
 
     func showSettings() {
