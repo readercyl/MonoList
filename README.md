@@ -72,6 +72,8 @@ bash scripts/check-app-launch.sh
 
 除版本检测和下载安装包外，MonoList 不会主动联网。
 
+在「设置 → 启动」关闭「在 Dock 中显示」可即时隐藏 Dock 图标。右键点击菜单栏图标仍可打开「设置」。
+
 ## 发布说明
 
 正式版本使用固定的 `MonoList Local Signing` 本地签名，不使用 Apple
