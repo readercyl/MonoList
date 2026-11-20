@@ -572,6 +572,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             },
             center.addObserver(
+                forName: MenuBarBridgeProtocol.showHome,
+                object: MenuBarBridgeProtocol.channel(parentProcessID: ProcessInfo.processInfo.processIdentifier),
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in self?.windowCoordinator?.showHome() }
+            },
+            center.addObserver(
                 forName: MenuBarBridgeProtocol.openSettings,
                 object: MenuBarBridgeProtocol.channel(parentProcessID: ProcessInfo.processInfo.processIdentifier),
                 queue: .main

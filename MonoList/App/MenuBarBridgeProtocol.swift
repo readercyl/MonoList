@@ -20,6 +20,9 @@ enum MenuBarBridgeProtocol {
     static let statusItemFrameChanged = Notification.Name(
         "com.qingcheng.monolist.menubar.v2.statusItemFrameChanged"
     )
+    static let showHome = Notification.Name(
+        "com.qingcheng.monolist.menubar.v2.showHome"
+    )
     static let quit = Notification.Name(
         "com.qingcheng.monolist.menubar.v2.quit"
     )

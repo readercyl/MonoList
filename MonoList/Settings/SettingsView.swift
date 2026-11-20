@@ -118,22 +118,23 @@ struct SettingsView: View {
                     .font(.system(size: 28, weight: .semibold))
                     .lineLimit(1)
                 Spacer(minLength: 0)
-                HStack(spacing: 7) {
-                    Text("版本 \(appVersion)")
+                HStack(spacing: 6) {
+                    Text("版本 v\(appVersion)")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(height: 24)
+                        .frame(height: 22)
                     Button(updater.isChecking ? "检测中…" : "检测新版本") {
                         Task {
                             await updater.check(manual: true, settings: settings)
                         }
                     }
                     .buttonStyle(InlineUpdateButtonStyle())
+                    .frame(width: 88, height: 22)
                     .disabled(updater.isChecking)
 
                     if !updater.statusText.isEmpty {
                         Text(updater.statusText)
-                            .font(.system(size: 11))
+                            .font(.system(size: 12))
                             .foregroundStyle(updateStatusColor)
                             .lineLimit(1)
                     }
@@ -142,6 +143,7 @@ struct SettingsView: View {
                             onInstallUpdate(update)
                         }
                         .buttonStyle(InlineUpdateButtonStyle())
+                        .frame(width: 58, height: 22)
                         .disabled(updater.isInstalling)
                     }
                 }
@@ -182,10 +184,6 @@ struct SettingsView: View {
                 .labelsHidden()
                 .toggleStyle(SettingsSwitchStyle())
             }
-            Text("轻提醒按待办顺序提示第一条没有单独提醒的任务。")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
             settingsRow("提醒声音") {
                 Toggle(
                     "",
@@ -350,29 +348,8 @@ struct SettingsView: View {
         }
     }
 
-    private var bothEntriesHidden: Bool {
-        !settings.values.showsInDock && !settings.values.showsInMenuBar
-    }
-
-    private var dockSwitchHint: String {
-        bothEntriesHidden
-            ? "Dock 和菜单栏都已关闭，之后只能从「应用程序」文件夹打开"
-            : "修改 Dock 显示后重新启动 MonoList 生效"
-    }
-
     private var startupSettings: some View {
         VStack(spacing: SettingsStyle.rowSpacing) {
-            settingsRow("自动更新") {
-                Toggle(
-                    "",
-                    isOn: binding(
-                        get: { settings.automaticUpdatesEnabled },
-                        update: { $0.automaticUpdatesEnabled = $1 }
-                    )
-                )
-                .labelsHidden()
-                .toggleStyle(SettingsSwitchStyle())
-            }
             settingsRow("在菜单栏显示") {
                 Toggle(
                     "在菜单栏显示",
@@ -395,10 +372,6 @@ struct SettingsView: View {
                 .labelsHidden()
                 .toggleStyle(SettingsSwitchStyle())
             }
-            Text(dockSwitchHint)
-                .font(.system(size: 11))
-                .foregroundStyle(bothEntriesHidden ? Color.orange : Color.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
             settingsRow("开机自动启动") {
                 if loginItemController.isDevelopmentBuild {
                     Text("由正式版管理")

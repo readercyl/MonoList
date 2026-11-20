@@ -72,6 +72,12 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
         if NSApp.currentEvent?.type == .rightMouseUp {
             let menu = NSMenu()
             menu.addItem(
+                withTitle: "显示主窗口",
+                action: #selector(showHome),
+                keyEquivalent: ""
+            )
+            menu.addItem(.separator())
+            menu.addItem(
                 withTitle: "设置",
                 action: #selector(openSettings),
                 keyEquivalent: ","
@@ -137,6 +143,15 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
     private func openSettings() {
         DistributedNotificationCenter.default().postNotificationName(
             MenuBarBridgeProtocol.openSettings,
+            object: MenuBarBridgeProtocol.channel(parentProcessID: parentProcessID),
+            deliverImmediately: true
+        )
+    }
+
+    @objc
+    private func showHome() {
+        DistributedNotificationCenter.default().postNotificationName(
+            MenuBarBridgeProtocol.showHome,
             object: MenuBarBridgeProtocol.channel(parentProcessID: parentProcessID),
             deliverImmediately: true
         )

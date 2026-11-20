@@ -6,9 +6,9 @@ final class WindowCoordinator {
     static let mainPanelWidth: CGFloat = 380
     static let mainPanelMinimumHeight: CGFloat = 106
     static let mainPanelMaximumHeight: CGFloat = 560
-    static let homeWindowDefaultSize = NSSize(width: 400, height: 660)
-    static let homeWindowMinimumSize = NSSize(width: 380, height: 520)
-    static let homeWindowAutosaveName = "MonoList.HomeWindow.CompactV4"
+    static let homeWindowDefaultSize = NSSize(width: 430, height: 660)
+    static let homeWindowMinimumSize = NSSize(width: 410, height: 520)
+    static let homeWindowAutosaveName = "MonoList.HomeWindow.CompactV5"
 
     static var appDisplayName: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ??

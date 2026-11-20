@@ -63,7 +63,7 @@ final class AppUpdater: ObservableObject {
         switch result {
         case let .available(update):
             availableUpdate = update
-            statusText = "发现新版本 \(update.version)"
+            statusText = "发现 \(update.version)"
             return update
         case .upToDate:
             availableUpdate = nil
