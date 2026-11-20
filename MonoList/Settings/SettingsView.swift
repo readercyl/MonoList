@@ -128,7 +128,7 @@ struct SettingsView: View {
                             await updater.check(manual: true, settings: settings)
                         }
                     }
-                    .buttonStyle(InlineUpdateButtonStyle())
+                    .buttonStyle(UpdatePillButtonStyle())
                     .disabled(updater.isChecking)
 
                     if !updater.statusText.isEmpty {
@@ -141,7 +141,7 @@ struct SettingsView: View {
                         Button(updater.isInstalling ? "升级中…" : "升级") {
                             onInstallUpdate(update)
                         }
-                        .buttonStyle(InlineUpdateButtonStyle())
+                        .buttonStyle(UpdatePillButtonStyle())
                         .disabled(updater.isInstalling)
                     }
                 }
@@ -291,10 +291,13 @@ struct SettingsView: View {
             }
             settingsRow("提醒测试") {
                 Button("立即测试", action: onTestReminder)
-                    .buttonStyle(FixedQuietButtonStyle())
+                    .buttonStyle(FixedQuietButtonStyle(width: SettingsStyle.controlWidth))
             }
         }
     }
+
+    /// 一列都是按键时统一宽度，取最长文案所需。
+    static let agentButtonWidth: CGFloat = 108
 
     static let systemSoundNames = [
         "Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero",
@@ -309,15 +312,15 @@ struct SettingsView: View {
                 .fixedSize(horizontal: false, vertical: true)
             settingsRow("接入说明") {
                 Button(copiedCLIInstructions ? "已复制" : "复制给智能体") { copyCLIInstructions() }
-                    .buttonStyle(FixedQuietButtonStyle())
+                    .buttonStyle(FixedQuietButtonStyle(width: Self.agentButtonWidth))
             }
             settingsRow("命令与示例") {
                 Button("查看说明") { showsCLICommands = true }
-                    .buttonStyle(FixedQuietButtonStyle())
+                    .buttonStyle(FixedQuietButtonStyle(width: Self.agentButtonWidth))
             }
             settingsRow("接口状态") {
                 Button(checkingCLI ? "检测中…" : "检测接口") { checkCLIConnection() }
-                    .buttonStyle(FixedQuietButtonStyle())
+                    .buttonStyle(FixedQuietButtonStyle(width: Self.agentButtonWidth))
                     .disabled(checkingCLI)
             }
             Text(cliStatus)
@@ -571,6 +574,24 @@ private struct SettingsCard<Content: View>: View {
     }
 }
 
+/// 版本行专用：胶囊按键，与主模块的方角控件区分。
+private struct UpdatePillButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .medium))
+            .padding(.horizontal, 12)
+            .frame(height: SettingsStyle.controlHeight)
+            .background(
+                configuration.isPressed ? Color.black.opacity(0.06) : Color.white,
+                in: Capsule()
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
+            )
+    }
+}
+
 private struct InlineUpdateButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -589,11 +610,13 @@ private struct InlineUpdateButtonStyle: ButtonStyle {
 }
 
 private struct FixedQuietButtonStyle: ButtonStyle {
+    var width: CGFloat?
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 13, weight: .medium))
             .padding(.horizontal, 10)
-            .frame(height: SettingsStyle.controlHeight)
+            .frame(width: width, height: SettingsStyle.controlHeight)
             .modifier(SettingValueBackground(isPressed: configuration.isPressed))
     }
 }
