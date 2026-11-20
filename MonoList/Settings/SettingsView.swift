@@ -1,10 +1,37 @@
 import AppKit
 import SwiftUI
 
-struct SettingsView: View {
-    private static let controlWidth: CGFloat = 180
-    private static let controlHeight: CGFloat = 26
+private enum SettingsStyle {
+    static let pagePadding: CGFloat = 16
+    static let cardSpacing: CGFloat = 12
+    static let cardPadding: CGFloat = 14
+    static let cardCornerRadius: CGFloat = 11
+    static let cardOpacity = 0.035
+    static let headingSize: CGFloat = 12
+    static let headingIconSpacing: CGFloat = 5
+    static let headingContentSpacing: CGFloat = 10
+    static let rowSpacing: CGFloat = 8
+    static let rowHeight: CGFloat = 34
+    static let rowLabelSize: CGFloat = 14
+    static let rowControlSpacing: CGFloat = 12
+    static let controlWidth: CGFloat = 180
+    static let switchWidth: CGFloat = 54
+    static let switchHeight: CGFloat = 28
+    static let switchThumbSize: CGFloat = 24
+    static let switchThumbInset: CGFloat = 3
+    static let switchOffOpacity = 0.16
+    static let switchThumbShadowOpacity = 0.18
+    static let switchThumbShadowRadius: CGFloat = 1.5
+    static let switchThumbShadowOffset: CGFloat = 1
 
+    static var switchThumbOffset: CGFloat {
+        (switchWidth - switchThumbSize) / 2 - switchThumbInset
+    }
+
+    static let controlHeight: CGFloat = 26
+}
+
+struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var taskStore: TaskStore
     @ObservedObject var reminderScheduler: ReminderScheduler
@@ -23,7 +50,7 @@ struct SettingsView: View {
 
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: SettingsStyle.cardSpacing) {
             softwareInformation
             SettingsCard(title: "轻提醒", systemImage: "bell") {
                 reminderSettings
@@ -35,7 +62,7 @@ struct SettingsView: View {
                 agentConnectionSettings
             }
         }
-        .padding(16)
+        .padding(SettingsStyle.pagePadding)
         .frame(maxWidth: .infinity)
         .fixedSize(horizontal: false, vertical: true)
         .background(Color.white)
@@ -143,7 +170,7 @@ struct SettingsView: View {
     }
 
     private var reminderSettings: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: SettingsStyle.rowSpacing) {
             settingsRow("启用轻提醒") {
                 Toggle(
                     "",
@@ -180,7 +207,7 @@ struct SettingsView: View {
                     (NSSound(named: NSSound.Name(title)) ??
                         NSSound(named: NSSound.Name("Glass")))?.play()
                 }
-                .frame(width: Self.controlWidth, height: Self.controlHeight)
+                .frame(width: SettingsStyle.controlWidth, height: SettingsStyle.controlHeight)
                 .disabled(!settings.reminderEnabled || !settings.reminderSoundEnabled)
             }
             Divider().opacity(0.4)
@@ -200,7 +227,7 @@ struct SettingsView: View {
                             $0.reminderStartMinuteOfDay = minute
                         }
                     }
-                    .frame(width: 78, height: Self.controlHeight)
+                    .frame(width: 78, height: SettingsStyle.controlHeight)
                     Text("至")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
@@ -218,9 +245,9 @@ struct SettingsView: View {
                             $0.reminderEndMinuteOfDay = minute
                         }
                     }
-                    .frame(width: 78, height: Self.controlHeight)
+                    .frame(width: 78, height: SettingsStyle.controlHeight)
                 }
-                .frame(width: Self.controlWidth, height: Self.controlHeight)
+                .frame(width: SettingsStyle.controlWidth, height: SettingsStyle.controlHeight)
             }
             settingsRow("提醒间隔") {
                 SettingsPopupButton(
@@ -236,7 +263,7 @@ struct SettingsView: View {
                         $0.reminderIntervalMinutes = interval
                     }
                 }
-                .frame(width: Self.controlWidth, height: Self.controlHeight)
+                .frame(width: SettingsStyle.controlWidth, height: SettingsStyle.controlHeight)
             }
             settingsRow("下次提醒") {
                 Text(nextReminderText)
@@ -244,8 +271,8 @@ struct SettingsView: View {
                     .foregroundStyle(nextReminderColor)
                     .lineLimit(1)
                     .frame(
-                        width: Self.controlWidth,
-                        height: Self.controlHeight,
+                        width: SettingsStyle.controlWidth,
+                        height: SettingsStyle.controlHeight,
                         alignment: .center
                     )
                     .modifier(SettingValueBackground())
@@ -264,11 +291,11 @@ struct SettingsView: View {
                         $0.reminderPosition = position
                     }
                 }
-                .frame(width: Self.controlWidth, height: Self.controlHeight)
+                .frame(width: SettingsStyle.controlWidth, height: SettingsStyle.controlHeight)
             }
             settingsRow("提醒测试") {
                 Button("立即测试", action: onTestReminder)
-                    .buttonStyle(FixedQuietButtonStyle(width: 180))
+                    .buttonStyle(FixedQuietButtonStyle(width: SettingsStyle.controlWidth))
             }
         }
     }
@@ -279,22 +306,22 @@ struct SettingsView: View {
     ].filter { NSSound(named: NSSound.Name($0)) != nil }
 
     private var agentConnectionSettings: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: SettingsStyle.rowSpacing) {
             Text("复制说明给支持本机命令的智能体。")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             settingsRow("接入说明") {
                 Button(copiedCLIInstructions ? "已复制" : "复制给智能体") { copyCLIInstructions() }
-                    .buttonStyle(FixedQuietButtonStyle(width: Self.controlWidth))
+                    .buttonStyle(FixedQuietButtonStyle(width: SettingsStyle.controlWidth))
             }
             settingsRow("命令与示例") {
                 Button("查看说明") { showsCLICommands = true }
-                    .buttonStyle(FixedQuietButtonStyle(width: Self.controlWidth))
+                    .buttonStyle(FixedQuietButtonStyle(width: SettingsStyle.controlWidth))
             }
             settingsRow("接口状态") {
                 Button(checkingCLI ? "检测中…" : "检测接口") { checkCLIConnection() }
-                    .buttonStyle(FixedQuietButtonStyle(width: Self.controlWidth))
+                    .buttonStyle(FixedQuietButtonStyle(width: SettingsStyle.controlWidth))
                     .disabled(checkingCLI)
             }
             Text(cliStatus)
@@ -324,7 +351,7 @@ struct SettingsView: View {
     }
 
     private var startupSettings: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: SettingsStyle.rowSpacing) {
             settingsRow("自动更新") {
                 Toggle(
                     "",
@@ -352,7 +379,7 @@ struct SettingsView: View {
                     Text("由正式版管理")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(width: Self.controlWidth, height: Self.controlHeight)
+                        .frame(width: SettingsStyle.controlWidth, height: SettingsStyle.controlHeight)
                         .modifier(SettingValueBackground())
                 } else {
                     Toggle(
@@ -380,14 +407,14 @@ struct SettingsView: View {
         _ title: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        HStack {
+        HStack(spacing: 0) {
             Text(title)
-                .font(.system(size: 14, weight: .medium))
-            Spacer(minLength: 16)
+                .font(.system(size: SettingsStyle.rowLabelSize, weight: .medium))
+            Spacer(minLength: SettingsStyle.rowControlSpacing)
             content()
-                .frame(width: Self.controlWidth, alignment: .trailing)
+                .frame(width: SettingsStyle.controlWidth, alignment: .trailing)
         }
-        .frame(minHeight: 34)
+        .frame(minHeight: SettingsStyle.rowHeight)
     }
 
     private var appVersion: String {
@@ -526,21 +553,21 @@ private struct SettingsCard<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 5) {
+        VStack(alignment: .leading, spacing: SettingsStyle.headingContentSpacing) {
+            HStack(spacing: SettingsStyle.headingIconSpacing) {
                 Image(systemName: systemImage)
                     .accessibilityHidden(true)
                 Text(title)
             }
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: SettingsStyle.headingSize, weight: .semibold))
             .foregroundStyle(.secondary)
             content
         }
-        .padding(14)
+        .padding(SettingsStyle.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            (colorScheme == .dark ? Color.white : Color.black).opacity(0.035),
-            in: RoundedRectangle(cornerRadius: 11)
+            (colorScheme == .dark ? Color.white : Color.black).opacity(SettingsStyle.cardOpacity),
+            in: RoundedRectangle(cornerRadius: SettingsStyle.cardCornerRadius)
         )
     }
 }
@@ -578,24 +605,24 @@ private struct SettingsSwitchStyle: ToggleStyle {
         Button {
             configuration.isOn.toggle()
         } label: {
-            RoundedRectangle(cornerRadius: 14)
+            Capsule()
                 .fill(
                     configuration.isOn
                         ? Color.accentColor
-                        : Color.primary.opacity(0.16)
+                        : Color.primary.opacity(SettingsStyle.switchOffOpacity)
                 )
-                .frame(width: 54, height: 28)
+                .frame(width: SettingsStyle.switchWidth, height: SettingsStyle.switchHeight)
                 .overlay {
                     Circle()
                         .fill(Color.white)
-                        .frame(width: 24, height: 24)
+                        .frame(width: SettingsStyle.switchThumbSize, height: SettingsStyle.switchThumbSize)
                         .shadow(
-                            color: Color.black.opacity(0.18),
-                            radius: 1.5,
+                            color: Color.black.opacity(SettingsStyle.switchThumbShadowOpacity),
+                            radius: SettingsStyle.switchThumbShadowRadius,
                             x: 0,
-                            y: 1
+                            y: SettingsStyle.switchThumbShadowOffset
                         )
-                        .offset(x: configuration.isOn ? 13 : -13)
+                        .offset(x: configuration.isOn ? SettingsStyle.switchThumbOffset : -SettingsStyle.switchThumbOffset)
                 }
         }
         .buttonStyle(.plain)
