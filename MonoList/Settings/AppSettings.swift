@@ -2,12 +2,15 @@ import Combine
 import Foundation
 
 enum AppSettingsError: LocalizedError {
+    case loginItemRollbackFailed
     case recoveryRequired
     case invalidReminderInterval
     case invalidReminderTimeRange
 
     var errorDescription: String? {
         switch self {
+        case .loginItemRollbackFailed:
+            return "设置保存和启动项恢复均失败，请在系统设置检查启动项"
         case .recoveryRequired:
             return "设置数据读取失败，请重试"
         case .invalidReminderInterval:
@@ -174,6 +177,29 @@ final class AppSettings: ObservableObject {
         self.fileURL = fileURL
         self.writer = writer
         load()
+    }
+
+    func updateLaunchAtLogin(
+        _ enabled: Bool,
+        wasRegistered: Bool,
+        applyRegistration: (Bool) throws -> Void
+    ) throws {
+        guard loadError == nil else { throw AppSettingsError.recoveryRequired }
+        if enabled != wasRegistered {
+            try applyRegistration(enabled)
+        }
+        do {
+            try update { $0.launchAtLogin = enabled }
+        } catch {
+            if enabled != wasRegistered {
+                do {
+                    try applyRegistration(wasRegistered)
+                } catch {
+                    throw AppSettingsError.loginItemRollbackFailed
+                }
+            }
+            throw error
+        }
     }
 
     func backupForCLI() throws {

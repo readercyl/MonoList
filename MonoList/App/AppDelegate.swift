@@ -264,15 +264,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     throw TaskCLIError.message("缺少 enabled")
                 }
                 guard !isDevelopmentBuild else { throw LoginItemControllerError.developmentBuildReadOnly }
-                let previous = settings.launchAtLogin
                 try settings.backupForCLI()
-                try controller.setEnabled(enabled)
-                do { try settings.update { $0.launchAtLogin = enabled } }
-                catch {
-                    do { try controller.setEnabled(previous) }
-                    catch { throw TaskCLIError.message("设置保存和启动项恢复均失败，请在系统设置检查启动项") }
-                    throw error
-                }
+                try controller.setEnabled(enabled, savingIn: settings)
                 result = ["status": controller.statusText]
             case "view.get":
                 let state = TaskExpansionState.shared

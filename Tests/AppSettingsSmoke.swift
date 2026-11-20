@@ -94,6 +94,28 @@ struct AppSettingsSmoke {
         let unchangedData = try Data(contentsOf: unknownURL)
         precondition(unchangedData == original)
 
+        let failingSettings = AppSettings(fileURL: fileURL, writer: FailingSettingsWriter())
+        var registrationChanges: [Bool] = []
+        do {
+            try failingSettings.updateLaunchAtLogin(true, wasRegistered: false) {
+                registrationChanges.append($0)
+            }
+            preconditionFailure("Saving launch-at-login should fail")
+        } catch SettingsWriteFailure.writeDenied {
+            precondition(registrationChanges == [true, false])
+            precondition(!failingSettings.launchAtLogin)
+        }
+
         print("App settings smoke passed.")
+    }
+}
+
+private enum SettingsWriteFailure: Error {
+    case writeDenied
+}
+
+private struct FailingSettingsWriter: AtomicWriting {
+    func write(_ data: Data, to destinationURL: URL) throws {
+        throw SettingsWriteFailure.writeDenied
     }
 }

@@ -48,6 +48,18 @@ final class LoginItemController: ObservableObject {
         refresh()
     }
 
+    func setEnabled(_ enabled: Bool, savingIn settings: AppSettings) throws {
+        guard !isDevelopmentBuild else {
+            throw LoginItemControllerError.developmentBuildReadOnly
+        }
+        refresh()
+        try settings.updateLaunchAtLogin(
+            enabled,
+            wasRegistered: status == .enabled || status == .requiresApproval,
+            applyRegistration: setEnabled
+        )
+    }
+
     func setEnabled(_ enabled: Bool) throws {
         guard !isDevelopmentBuild else {
             throw LoginItemControllerError.developmentBuildReadOnly

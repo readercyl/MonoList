@@ -388,8 +388,7 @@ struct SettingsView: View {
                             get: { loginItemController.status == .enabled },
                             set: { enabled in
                                 do {
-                                    try loginItemController.setEnabled(enabled)
-                                    try settings.update { $0.launchAtLogin = enabled }
+                                    try loginItemController.setEnabled(enabled, savingIn: settings)
                                 } catch {
                                     errorMessage = error.localizedDescription
                                 }
