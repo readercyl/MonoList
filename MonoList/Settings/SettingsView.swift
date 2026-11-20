@@ -347,7 +347,7 @@ struct SettingsView: View {
                 .labelsHidden()
                 .toggleStyle(SettingsSwitchStyle())
             }
-            settingsRow("开机后自动启动") {
+            settingsRow("开机自动启动") {
                 if loginItemController.isDevelopmentBuild {
                     Text("由正式版管理")
                         .font(.system(size: 12, weight: .medium))
