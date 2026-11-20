@@ -31,6 +31,55 @@ private enum SettingsStyle {
     static let controlHeight: CGFloat = 26
 }
 
+/// CLI 接入说明浮层：点击卡片以外区域即关闭。
+struct CLICommandsCard: View {
+    let onClose: () -> Void
+    @State private var copied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("CLI 命令与示例").font(.headline)
+                Spacer()
+                Button("关闭", action: onClose)
+                    .keyboardShortcut(.cancelAction)
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("先打开 MonoList，再把接入说明粘贴给能运行本机命令的智能体。")
+                    Text(Self.instructions)
+                    Divider()
+                    Text(TaskCLI.help)
+                }
+                .font(.system(size: 12, design: .monospaced))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Button(copied ? "已复制" : "复制接入说明") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(Self.instructions, forType: .string)
+                copied = true
+            }
+            .buttonStyle(FixedQuietButtonStyle())
+        }
+        .padding(16)
+        .frame(width: 380, height: 440)
+        .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: SettingsStyle.cardCornerRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: SettingsStyle.cardCornerRadius)
+                .stroke(Color.primary.opacity(0.10), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+    }
+
+    private static var instructions: String {
+        TaskCLI.agentInstructions(
+            bundleURL: Bundle.main.bundleURL,
+            bundleID: Bundle.main.bundleIdentifier ?? ""
+        )
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var taskStore: TaskStore
@@ -43,7 +92,7 @@ struct SettingsView: View {
 
     @State private var errorMessage: String?
     @State private var currentDate = Date()
-    @State private var showsCLICommands = false
+    @Binding var showsCLICommands: Bool
     @State private var copiedCLIInstructions = false
     @State private var checkingCLI = false
     @State private var cliStatus = "尚未检测"
@@ -78,31 +127,6 @@ struct SettingsView: View {
         } message: {
             Text(errorMessage ?? "")
         }
-        .sheet(isPresented: $showsCLICommands) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("CLI 命令与示例").font(.headline)
-                    Spacer()
-                    Button("关闭") { showsCLICommands = false }
-                        .keyboardShortcut(.cancelAction)
-                }
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("先打开 MonoList，再把接入说明粘贴给能运行本机命令的智能体。")
-                        Text(TaskCLI.agentInstructions(bundleURL: Bundle.main.bundleURL,
-                            bundleID: Bundle.main.bundleIdentifier ?? ""))
-                        Divider()
-                        Text(TaskCLI.help)
-                    }
-                    .font(.system(size: 12, design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                Button("复制接入说明") { copyCLIInstructions() }
-            }
-            .padding(16)
-            .frame(width: 380, height: 440)
-        }
         .onReceive(
             Timer.publish(every: 60, on: .main, in: .common).autoconnect()
         ) { date in
@@ -123,26 +147,27 @@ struct SettingsView: View {
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary)
                         .frame(height: SettingsStyle.controlHeight)
-                    Button(updater.isChecking ? "检测中…" : "检测新版本") {
-                        Task {
-                            await updater.check(manual: true, settings: settings)
-                        }
-                    }
-                    .buttonStyle(UpdatePillButtonStyle())
-                    .disabled(updater.isChecking)
-
                     if !updater.statusText.isEmpty {
                         Text(updater.statusText)
                             .font(.system(size: 13))
                             .foregroundStyle(updateStatusColor)
                             .lineLimit(1)
                     }
+
                     if let update = updater.availableUpdate {
                         Button(updater.isInstalling ? "升级中…" : "升级") {
                             onInstallUpdate(update)
                         }
                         .buttonStyle(UpdatePillButtonStyle())
                         .disabled(updater.isInstalling)
+                    } else {
+                        Button(updater.isChecking ? "检测中…" : "检测新版本") {
+                            Task {
+                                await updater.check(manual: true, settings: settings)
+                            }
+                        }
+                        .buttonStyle(UpdatePillButtonStyle())
+                        .disabled(updater.isChecking)
                     }
                 }
             }
@@ -580,7 +605,7 @@ private struct UpdatePillButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: 13, weight: .medium))
             .padding(.horizontal, 12)
-            .frame(height: SettingsStyle.controlHeight)
+            .frame(height: 24)
             .background(
                 configuration.isPressed ? Color.black.opacity(0.06) : Color.white,
                 in: Capsule()

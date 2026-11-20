@@ -26,6 +26,7 @@ struct HomeView: View {
 
     @StateObject private var draftState = TaskDraftState()
     @State private var currentDate = Date()
+    @State private var showsCLICommands = false
     @StateObject private var expansionState = TaskExpansionState.shared
     private var collapsedTaskIDs: Set<UUID> {
         get { expansionState.collapsedTaskIDs }
@@ -188,23 +189,37 @@ struct HomeView: View {
     }
 
     private var settingsContent: some View {
-        ScrollView(.vertical) {
-            SettingsView(
-                settings: settings,
-                taskStore: store,
-                reminderScheduler: reminderScheduler,
-                loginItemController: loginItemController,
-                updater: updater,
-                onInstallUpdate: onInstallUpdate,
-                onTestReminder: onTestReminder,
-                onBack: { presentation.section = .tasks }
-            )
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+        ZStack {
+            ScrollView(.vertical) {
+                SettingsView(
+                    settings: settings,
+                    taskStore: store,
+                    reminderScheduler: reminderScheduler,
+                    loginItemController: loginItemController,
+                    updater: updater,
+                    onInstallUpdate: onInstallUpdate,
+                    onTestReminder: onTestReminder,
+                    onBack: { presentation.section = .tasks },
+                    showsCLICommands: $showsCLICommands
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            }
+            .scrollBounceBehavior(.always, axes: .vertical)
+
+            if showsCLICommands {
+                // 点击浮层以外区域关闭
+                Color.black.opacity(0.16)
+                    .ignoresSafeArea()
+                    .onTapGesture { showsCLICommands = false }
+                    .transition(.opacity)
+                CLICommandsCard { showsCLICommands = false }
+                    .transition(.opacity)
+            }
         }
-        .scrollBounceBehavior(.always, axes: .vertical)
         .background(Color(nsColor: .windowBackgroundColor))
         .frame(maxWidth: .infinity, alignment: .top)
+        .animation(.easeOut(duration: 0.12), value: showsCLICommands)
     }
 
     private var toolbar: some View {
