@@ -510,6 +510,7 @@ struct SettingsView: View {
 }
 
 private struct SettingsCard<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let systemImage: String
     @ViewBuilder let content: Content
@@ -526,14 +527,21 @@ private struct SettingsCard<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(title, systemImage: systemImage)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
+            HStack(spacing: 5) {
+                Image(systemName: systemImage)
+                    .accessibilityHidden(true)
+                Text(title)
+            }
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(.secondary)
             content
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 11))
+        .background(
+            (colorScheme == .dark ? Color.white : Color.black).opacity(0.035),
+            in: RoundedRectangle(cornerRadius: 11)
+        )
     }
 }
 
