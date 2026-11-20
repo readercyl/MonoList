@@ -222,6 +222,8 @@ struct TaskListView: View {
                 Divider()
                 Button("清空全部任务", role: .destructive) { clearAction = .all }
                     .disabled(store.tasks.isEmpty)
+                Divider()
+                Button("退出 MonoList") { NSApp.terminate(nil) }
             } label: {
                 PanelHeaderIconLabel(systemName: "ellipsis")
             }
