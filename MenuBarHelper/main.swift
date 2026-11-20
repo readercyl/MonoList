@@ -72,7 +72,7 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
         if NSApp.currentEvent?.type == .rightMouseUp {
             let menu = NSMenu()
             menu.addItem(
-                withTitle: "打开控制台",
+                withTitle: "设置",
                 action: #selector(openSettings),
                 keyEquivalent: ","
             )
