@@ -35,6 +35,7 @@ struct TaskStoreSmoke {
         try testOneTimeReminderPersistsAndClears()
         try testCountdownAndScheduledDateConstruction()
         try testDailyReminderReappearsAfterMidnight()
+        try testOverdueDailyReminderWaitsUntilTomorrow()
         try testDeleteAndClearScopes()
         try testWriteFailureKeepsCommittedState()
         try testUnknownSchemaDoesNotOverwriteFile()
@@ -385,6 +386,25 @@ struct TaskStoreSmoke {
         try require(TaskReminder.once(on: day, minuteOfDay: 24 * 60,
                                       calendar: calendar) == nil,
                     "越界时间不应生成提醒")
+    }
+
+    @MainActor
+    private static func testOverdueDailyReminderWaitsUntilTomorrow() throws {
+        let fixture = try Fixture()
+        let store = TaskStore(fileURL: fixture.fileURL)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let yesterday = Date(timeIntervalSince1970: 1_700_000_000)
+        let today = calendar.date(byAdding: .day, value: 1, to: yesterday)!
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
+        let item = try store.add(text: "Daily task", createdAt: yesterday)
+        try store.updateReminder(id: item.id, reminder: .daily(minuteOfDay: 600), at: yesterday)
+        try store.complete(id: item.id, at: today)
+
+        try store.refreshDailyReminderTasks(at: today.addingTimeInterval(60), calendar: calendar)
+        try require(store.pendingTasks.isEmpty, "A late daily completion must not recreate the task on the same day")
+        try store.refreshDailyReminderTasks(at: tomorrow, calendar: calendar)
+        try require(store.pendingTasks.count == 1, "The daily task must return the following day")
     }
 
     @MainActor

@@ -513,7 +513,7 @@ final class TaskStore: ObservableObject {
             if reminderTaskGroup.contains(where: { $0.status == .pending }) {
                 continue
             }
-            if calendar.startOfDay(for: source.createdAt) >= startOfToday {
+            if calendar.startOfDay(for: source.completedAt ?? source.createdAt) >= startOfToday {
                 continue
             }
             var reminder = source.reminder
