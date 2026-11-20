@@ -70,6 +70,7 @@ struct SettingsValues: Codable, Equatable {
     var automaticUpdatesEnabled = true
     var launchAtLogin = false
     var showsInDock = true
+    var showsInMenuBar = true
     var globalShortcut: ShortcutDefinition?
     var lastAutomaticUpdateCheckAt: Date?
 
@@ -86,6 +87,7 @@ struct SettingsValues: Codable, Equatable {
         case automaticUpdatesEnabled
         case launchAtLogin
         case showsInDock
+        case showsInMenuBar
         case globalShortcut
         case lastAutomaticUpdateCheckAt
     }
@@ -129,6 +131,7 @@ struct SettingsValues: Codable, Equatable {
             forKey: .launchAtLogin
         ) ?? false
         showsInDock = try container.decodeIfPresent(Bool.self, forKey: .showsInDock) ?? true
+        showsInMenuBar = try container.decodeIfPresent(Bool.self, forKey: .showsInMenuBar) ?? true
         globalShortcut = try container.decodeIfPresent(
             ShortcutDefinition.self,
             forKey: .globalShortcut

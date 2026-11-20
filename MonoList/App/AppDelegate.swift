@@ -111,7 +111,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.applyDockVisibility(settings.values.showsInDock)
         if isolatedPath == nil { showHomeForInteractiveLaunch() }
         let initialMenuBarStatus = Self.menuBarStatus(tasks: store.tasks)
-        if isolatedPath == nil { launchMenuBarHelper(status: initialMenuBarStatus) }
+        if isolatedPath == nil, settings.values.showsInMenuBar {
+            launchMenuBarHelper(status: initialMenuBarStatus)
+        }
+        settings.$values
+            .map(\.showsInMenuBar)
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] showsInMenuBar in
+                guard isolatedPath == nil else { return }
+                self?.applyMenuBarVisibility(showsInMenuBar)
+            }
+            .store(in: &cancellables)
         store.$tasks
             .map { tasks in Self.menuBarStatus(tasks: tasks) }
             .removeDuplicates()
@@ -238,13 +249,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 let fields: Set<String> = ["reminderEnabled", "reminderIntervalMinutes",
                     "reminderStartMinuteOfDay", "reminderEndMinuteOfDay", "reminderPosition",
-                    "reminderSoundEnabled", "reminderSoundName", "automaticUpdatesEnabled", "showsInDock"]
+                    "reminderSoundEnabled", "reminderSoundName", "automaticUpdatesEnabled",
+                    "showsInDock", "showsInMenuBar"]
                 guard Set(patch.keys).isSubset(of: fields), !patch.values.contains(where: { $0 is NSNull }) else {
                     throw TaskCLIError.message("未知或只读设置；开机启动请用 login.set")
                 }
                 var merged = try json(settings.values) as! [String: Any]
                 merged.merge(patch) { _, new in new }
-                let candidate = try JSONDecoder().decode(SettingsValues.self,
+                // 与 TaskCLI.encode 的日期策略保持一致，否则回读 lastAutomaticUpdateCheckAt 会失败。
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                let candidate = try decoder.decode(SettingsValues.self,
                     from: JSONSerialization.data(withJSONObject: merged))
                 guard [30, 60, 90, 120].contains(candidate.reminderIntervalMinutes),
                       AppSettings.isValidReminderTimeRange(startMinuteOfDay: candidate.reminderStartMinuteOfDay,
@@ -603,6 +618,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func launchMenuBarHelper(status: MenuBarStatus) {
+        guard menuBarHelperApplication == nil else { return }
         let helperURL = Bundle.main.bundleURL.appendingPathComponent(
             "Contents/Library/Helpers/MenuBarService.app"
         )
@@ -628,6 +644,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showOrFocusMainPanelAtFallback() {
         windowCoordinator?.showOrFocusMainPanelFromMenuBar()
+    }
+
+    /// 菜单栏图标由独立 helper 进程提供，隐藏即退出该进程，重新显示时再拉起。
+    private func applyMenuBarVisibility(_ showsInMenuBar: Bool) {
+        if showsInMenuBar {
+            guard let store = taskStore else { return }
+            launchMenuBarHelper(status: Self.menuBarStatus(tasks: store.tasks))
+        } else {
+            menuBarHelperApplication?.terminate()
+            menuBarHelperApplication = nil
+        }
     }
 
     private func checkForAutomaticUpdate() async {

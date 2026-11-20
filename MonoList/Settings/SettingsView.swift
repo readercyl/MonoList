@@ -350,6 +350,16 @@ struct SettingsView: View {
         }
     }
 
+    private var bothEntriesHidden: Bool {
+        !settings.values.showsInDock && !settings.values.showsInMenuBar
+    }
+
+    private var dockSwitchHint: String {
+        bothEntriesHidden
+            ? "Dock 和菜单栏都已关闭，之后只能从「应用程序」文件夹打开"
+            : "修改 Dock 显示后重新启动 MonoList 生效"
+    }
+
     private var startupSettings: some View {
         VStack(spacing: SettingsStyle.rowSpacing) {
             settingsRow("自动更新") {
@@ -358,6 +368,17 @@ struct SettingsView: View {
                     isOn: binding(
                         get: { settings.automaticUpdatesEnabled },
                         update: { $0.automaticUpdatesEnabled = $1 }
+                    )
+                )
+                .labelsHidden()
+                .toggleStyle(SettingsSwitchStyle())
+            }
+            settingsRow("在菜单栏显示") {
+                Toggle(
+                    "在菜单栏显示",
+                    isOn: binding(
+                        get: { settings.values.showsInMenuBar },
+                        update: { $0.showsInMenuBar = $1 }
                     )
                 )
                 .labelsHidden()
@@ -374,9 +395,9 @@ struct SettingsView: View {
                 .labelsHidden()
                 .toggleStyle(SettingsSwitchStyle())
             }
-            Text("修改后重新启动 MonoList 生效")
+            Text(dockSwitchHint)
                 .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(bothEntriesHidden ? Color.orange : Color.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             settingsRow("开机自动启动") {
                 if loginItemController.isDevelopmentBuild {
