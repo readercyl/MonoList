@@ -3,21 +3,21 @@ import SwiftUI
 
 private enum SettingsStyle {
     static let pagePadding: CGFloat = 16
-    static let cardSpacing: CGFloat = 12
+    static let cardSpacing: CGFloat = 10
     static let cardPadding: CGFloat = 14
     static let cardCornerRadius: CGFloat = 11
     static let cardOpacity = 0.035
     static let headingSize: CGFloat = 12
     static let headingIconSpacing: CGFloat = 5
     static let headingContentSpacing: CGFloat = 10
-    static let rowSpacing: CGFloat = 8
-    static let rowHeight: CGFloat = 34
+    static let rowSpacing: CGFloat = 6
+    static let rowHeight: CGFloat = 28
     static let rowLabelSize: CGFloat = 14
     static let rowControlSpacing: CGFloat = 12
     static let controlWidth: CGFloat = 180
-    static let switchWidth: CGFloat = 54
-    static let switchHeight: CGFloat = 28
-    static let switchThumbSize: CGFloat = 24
+    static let switchWidth: CGFloat = 40
+    static let switchHeight: CGFloat = 20
+    static let switchThumbSize: CGFloat = 16
     static let switchThumbInset: CGFloat = 3
     static let switchOffOpacity = 0.16
     static let switchThumbShadowOpacity = 0.18
@@ -624,6 +624,8 @@ private struct SettingsSwitchStyle: ToggleStyle {
                         )
                         .offset(x: configuration.isOn ? SettingsStyle.switchThumbOffset : -SettingsStyle.switchThumbOffset)
                 }
+                .frame(height: SettingsStyle.rowHeight)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .animation(.easeOut(duration: 0.12), value: configuration.isOn)
