@@ -374,6 +374,10 @@ struct SettingsView: View {
                 .labelsHidden()
                 .toggleStyle(SettingsSwitchStyle())
             }
+            Text("修改后重新启动 MonoList 生效")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             settingsRow("开机自动启动") {
                 if loginItemController.isDevelopmentBuild {
                     Text("由正式版管理")

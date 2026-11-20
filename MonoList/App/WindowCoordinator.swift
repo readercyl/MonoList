@@ -59,9 +59,6 @@ final class WindowCoordinator {
     private var pendingResizeWorkItem: DispatchWorkItem?
     private weak var previousApplication: NSRunningApplication?
     private var homeWindow: NSWindow?
-    private weak var dockSwitchFocusWindow: NSWindow?
-    private var dockSwitchFocusDeadline: TimeInterval = 0
-    private var dockSwitchFocusAttempts = 0
     private let homePresentationState = HomePresentationState()
     private var settings: AppSettings?
     private var reminderScheduler: ReminderScheduler?
@@ -292,34 +289,12 @@ final class WindowCoordinator {
         homeWindow?.orderOut(nil)
     }
 
+    /// 只在启动时应用：运行时改激活策略会让应用掉一次前台（WindowServer 重新注册进程），
+    /// 界面上的开关只保存偏好，重新启动后按新偏好生效。
     func applyDockVisibility(_ showsInDock: Bool) {
         let policy: NSApplication.ActivationPolicy = showsInDock ? .regular : .accessory
         guard NSApp.activationPolicy() != policy else { return }
-        let focusedWindow = NSApp.isActive && homeWindow?.isKeyWindow == true ? homeWindow : nil
-        guard NSApp.setActivationPolicy(policy), let focusedWindow else { return }
-
-        // WindowServer 切换策略后还会再落一次失活（约 90ms），早于它的激活都会被吞掉，
-        // 固定延迟必然露出空窗。改为在失活回调里立刻抢回焦点。
-        focusedWindow.orderFrontRegardless()
-        dockSwitchFocusWindow = focusedWindow
-        dockSwitchFocusDeadline = ProcessInfo.processInfo.systemUptime + 0.6
-        dockSwitchFocusAttempts = 0
-    }
-
-    /// 由 AppDelegate 的 applicationDidResignActive 调用，只在 Dock 显示切换后的短时间内生效。
-    func restoreDockSwitchFocus() {
-        guard let focusedWindow = dockSwitchFocusWindow else { return }
-        guard ProcessInfo.processInfo.systemUptime < dockSwitchFocusDeadline,
-              dockSwitchFocusAttempts < 3,
-              focusedWindow.isVisible,
-              !focusedWindow.isMiniaturized else {
-            dockSwitchFocusWindow = nil
-            return
-        }
-        dockSwitchFocusAttempts += 1
-        focusedWindow.makeKey()
-        NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
-        NSApp.activate()
+        NSApp.setActivationPolicy(policy)
     }
 
     func showSettings() {

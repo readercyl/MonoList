@@ -104,13 +104,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.updateInstaller = updateInstaller
         windowCoordinator = coordinator
         installMenuBarObservers()
-        settings.$values
-            .map(\.showsInDock)
-            .removeDuplicates()
-            .sink { [weak coordinator] showsInDock in
-                coordinator?.applyDockVisibility(showsInDock)
-            }
-            .store(in: &cancellables)
+        // Dock 显示只在启动时应用；运行时切换会让应用掉一次前台，界面开关只保存偏好。
+        coordinator.applyDockVisibility(settings.values.showsInDock)
         if isolatedPath == nil { showHomeForInteractiveLaunch() }
         let initialMenuBarStatus = Self.menuBarStatus(tasks: store.tasks)
         if isolatedPath == nil { launchMenuBarHelper(status: initialMenuBarStatus) }
@@ -353,10 +348,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ) -> Bool {
         windowCoordinator?.showHome()
         return true
-    }
-
-    func applicationDidResignActive(_ notification: Notification) {
-        windowCoordinator?.restoreDockSwitchFocus()
     }
 
     private func showHomeForInteractiveLaunch() {
