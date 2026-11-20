@@ -122,7 +122,7 @@ struct SettingsView: View {
                     Text("版本 v\(appVersion)")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(height: 22)
+                        .frame(height: SettingsStyle.controlHeight)
                     Button(updater.isChecking ? "检测中…" : "检测新版本") {
                         Task {
                             await updater.check(manual: true, settings: settings)
@@ -576,7 +576,7 @@ private struct InlineUpdateButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: 13, weight: .medium))
             .padding(.horizontal, 10)
-            .frame(height: 22)
+            .frame(height: SettingsStyle.controlHeight)
             .background(
                 configuration.isPressed ? Color.black.opacity(0.05) : Color.white,
                 in: RoundedRectangle(cornerRadius: 6)
@@ -593,7 +593,7 @@ private struct FixedQuietButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: 13, weight: .medium))
             .padding(.horizontal, 10)
-            .frame(height: 22)
+            .frame(height: SettingsStyle.controlHeight)
             .modifier(SettingValueBackground(isPressed: configuration.isPressed))
     }
 }
